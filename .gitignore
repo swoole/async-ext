@@ -89,6 +89,7 @@ cmake-build-debug/
 /core-tests/cmake_install.cmake
 /tools/vendor
 /tools/composer.lock
+/*.la
 /examples/wrapper/CMakeFiles
 /examples/wrapper/CMakeCache.txt
 /examples/wrapper/Makefile
