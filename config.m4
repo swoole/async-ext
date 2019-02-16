@@ -69,6 +69,9 @@ if test "$PHP_SWOOLE_ASYNC" != "no"; then
     swoole_source_file="swoole_async.cc \
         swoole_mysql.c \
         swoole_redis.c \
+        swoole_msgqueue.c \
+        swoole_ringqueue.c \
+        swoole_memory_pool.c \
         swoole_http_client.c"
 
     PHP_NEW_EXTENSION(swoole_async, $swoole_source_file, $ext_shared,,, cxx)

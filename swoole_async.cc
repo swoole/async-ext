@@ -1156,6 +1156,9 @@ PHP_MINIT_FUNCTION(swoole_async)
     swoole_async_init(module_number);
     swoole_mysql_init(module_number);
     swoole_redis_init(module_number);
+    swoole_ringqueue_init(module_number);
+    swoole_msgqueue_init(module_number);
+    swoole_memory_pool_init(module_number);
 
     return SUCCESS;
 }
