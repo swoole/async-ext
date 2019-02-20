@@ -2225,8 +2225,6 @@ static PHP_METHOD(swoole_mysql, __construct)
 {
     mysql_client *client = emalloc(sizeof(mysql_client));
 
-    swoole_php_fatal_error(E_DEPRECATED, "async APIs will be removed in Swoole-v4.3.0, you should be using the coroutine APIs instead.");
-
     bzero(client, sizeof(mysql_client));
     swoole_set_object(getThis(), client);
 }

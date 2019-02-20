@@ -199,8 +199,6 @@ static PHP_METHOD(swoole_redis, __construct)
 {
     zval *zset = NULL;
 
-    swoole_php_fatal_error(E_DEPRECATED, "async APIs will be removed in Swoole-v4.3.0, you should be using the coroutine APIs instead.");
-
     if (zend_parse_parameters(ZEND_NUM_ARGS(), "|z", &zset) == FAILURE)
     {
         RETURN_FALSE;

@@ -1443,8 +1443,6 @@ static PHP_METHOD(swoole_http_client, __construct)
     zend_long port = 80;
     zend_bool ssl = SW_FALSE;
 
-    swoole_php_fatal_error(E_DEPRECATED, "async APIs will be removed in Swoole-v4.3.0, you should be using the coroutine APIs instead.");
-
     if (zend_parse_parameters(ZEND_NUM_ARGS(), "s|lb", &host, &host_len, &port, &ssl) == FAILURE)
     {
         RETURN_FALSE;
