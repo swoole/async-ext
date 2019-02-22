@@ -25,7 +25,7 @@ extern "C" {
 #include "ext/standard/php_http.h"
 #include "ext/standard/base64.h"
 
-#include "swoole_http.h"
+#include "swoole_http_async.h"
 #include "websocket.h"
 #include "thirdparty/swoole_http_parser.h"
 

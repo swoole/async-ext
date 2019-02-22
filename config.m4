@@ -71,6 +71,8 @@ if test "$PHP_SWOOLE_ASYNC" != "no"; then
         swoole_redis.c \
         swoole_msgqueue.c \
         swoole_ringqueue.c \
+	swoole_channel.c \
+	swoole_mmap.c \
         swoole_memory_pool.c \
         swoole_http_client.c"
 
