@@ -1155,6 +1155,8 @@ PHP_MINIT_FUNCTION(swoole_async)
     swoole_http_client_init(module_number);
     swoole_async_init(module_number);
     swoole_mysql_init(module_number);
+    swoole_mmap_init(module_number);
+    swoole_channel_init(module_number);
     swoole_redis_init(module_number);
     swoole_ringqueue_init(module_number);
     swoole_msgqueue_init(module_number);
