@@ -30,6 +30,8 @@
 #include <openssl/pem.h>
 #endif
 
+static swString *mysql_request_buffer;
+
 static PHP_METHOD(swoole_mysql, __construct);
 static PHP_METHOD(swoole_mysql, __destruct);
 static PHP_METHOD(swoole_mysql, connect);
@@ -220,6 +222,8 @@ void swoole_mysql_init(int module_number)
     zend_declare_class_constant_long(swoole_mysql_ce_ptr, ZEND_STRL("STATE_READ_ROW"), SW_MYSQL_STATE_READ_ROW);
     zend_declare_class_constant_long(swoole_mysql_ce_ptr, ZEND_STRL("STATE_READ_END"), SW_MYSQL_STATE_READ_END);
     zend_declare_class_constant_long(swoole_mysql_ce_ptr, ZEND_STRL("STATE_CLOSED"), SW_MYSQL_STATE_CLOSED);
+
+    mysql_request_buffer = swString_new(SW_BUFFER_SIZE_STD);
 }
 
 int mysql_request_pack(swString *sql, swString *buffer)

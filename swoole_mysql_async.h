@@ -396,8 +396,6 @@ typedef struct _mysql_client
 
 } mysql_client;
 
-#define mysql_request_buffer (SwooleTG.buffer_stack)
-
 #define SW_MYSQL_NOT_NULL_FLAG               1
 #define SW_MYSQL_PRI_KEY_FLAG                2
 #define SW_MYSQL_UNIQUE_KEY_FLAG             4
