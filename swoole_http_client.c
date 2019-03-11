@@ -1096,7 +1096,7 @@ static int http_client_send_http_request(zval *zobject)
                 zend_string *str = zval_get_string(value);
                 //strlen("%.*s")*2 = 8
                 //header + body + CRLF(2)
-                content_length += (sizeof(SW_HTTP_FORM_RAW_DATA_FMT) - SW_HTTP_FORM_RAW_DATA_FMT_LEN -1) + (sizeof(boundary_str) - 1) + keylen + _value.len() + 2;
+                content_length += (sizeof(SW_HTTP_FORM_RAW_DATA_FMT) - SW_HTTP_FORM_RAW_DATA_FMT_LEN -1) + (sizeof(boundary_str) - 1) + keylen + ZSTR_LEN(str) + 2;
                 zend_string_release(str);
             SW_HASHTABLE_FOREACH_END();
         }
