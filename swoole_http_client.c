@@ -18,6 +18,14 @@
 #include "php_swoole_async.h"
 #include "swoole_http_client_async.h"
 
+#ifndef SW_HTTP_CLIENT_BOUNDARY_TOTAL_SIZE
+#define SW_HTTP_CLIENT_BOUNDARY_TOTAL_SIZE   39
+#define SW_HTTP_FORM_RAW_DATA_FMT            "--%.*s\r\nContent-Disposition: form-data; name=\"%.*s\"\r\n\r\n"
+#define SW_HTTP_FORM_RAW_DATA_FMT_LEN        8
+#define SW_HTTP_FORM_FILE_DATA_FMT           "--%.*s\r\nContent-Disposition: form-data; name=\"%.*s\"; filename=\"%.*s\"\r\nContent-Type: %.*s\r\n\r\n"
+#define SW_HTTP_FORM_FILE_DATA_FMT_LEN       16
+#endif
+
 typedef struct
 {
     zval *onConnect;
@@ -1063,7 +1071,7 @@ static int http_client_send_http_request(zval *zobject)
     if (hcc->request_upload_files)
     {
         char header_buf[2048];
-        char boundary_str[39];
+        char boundary_str[SW_HTTP_CLIENT_BOUNDARY_TOTAL_SIZE];
         int n;
 
         memcpy(boundary_str, SW_HTTP_CLIENT_BOUNDARY_PREKEY, sizeof(SW_HTTP_CLIENT_BOUNDARY_PREKEY) - 1);
@@ -1086,10 +1094,9 @@ static int http_client_send_http_request(zval *zobject)
                     continue;
                 }
                 zend_string *str = zval_get_string(value);
-                //strlen("%.*")*2 = 6
-                //header + body + CRLF
-                content_length += (sizeof(SW_HTTP_FORM_DATA_FORMAT_STRING) - 7) + (sizeof(boundary_str) - 1) + keylen
-                        + ZSTR_LEN(str) + 2;
+                //strlen("%.*s")*2 = 8
+                //header + body + CRLF(2)
+                content_length += (sizeof(SW_HTTP_FORM_RAW_DATA_FMT) - SW_HTTP_FORM_RAW_DATA_FMT_LEN -1) + (sizeof(boundary_str) - 1) + keylen + _value.len() + 2;
                 zend_string_release(str);
             SW_HASHTABLE_FOREACH_END();
         }
@@ -1121,9 +1128,9 @@ static int http_client_send_http_request(zval *zobject)
                 {
                     continue;
                 }
-                //strlen("%.*")*4 = 12
-                //header + body + CRLF
-                content_length += (sizeof(SW_HTTP_FORM_DATA_FORMAT_FILE) - 13) + (sizeof(boundary_str) - 1)
+                //strlen("%.*s")*4 = 16
+                //header + body + CRLF(2)
+                content_length += (sizeof(SW_HTTP_FORM_FILE_DATA_FMT) - SW_HTTP_FORM_FILE_DATA_FMT_LEN - 1) + (sizeof(boundary_str) - 1)
                         + Z_STRLEN_P(zname) + Z_STRLEN_P(zfilename) + Z_STRLEN_P(ztype) + Z_LVAL_P(zsize) + 2;
             SW_HASHTABLE_FOREACH_END();
         }
@@ -1139,7 +1146,7 @@ static int http_client_send_http_request(zval *zobject)
                     continue;
                 }
                 zend_string *str = zval_get_string(value);
-                n = sw_snprintf(header_buf, sizeof(header_buf), SW_HTTP_FORM_DATA_FORMAT_STRING, (int)(sizeof(boundary_str) - 1),
+                n = sw_snprintf(header_buf, sizeof(header_buf), SW_HTTP_FORM_RAW_DATA_FMT, (int)(sizeof(boundary_str) - 1),
                         boundary_str, keylen, key);
                 swString_append_ptr(http_client_buffer, header_buf, n);
                 swString_append_ptr(http_client_buffer, ZSTR_VAL(str), ZSTR_LEN(str));
@@ -1185,7 +1192,7 @@ static int http_client_send_http_request(zval *zobject)
                     continue;
                 }
 
-                n = sw_snprintf(header_buf, sizeof(header_buf), SW_HTTP_FORM_DATA_FORMAT_FILE, (int)(sizeof(boundary_str) - 1),
+                n = sw_snprintf(header_buf, sizeof(header_buf), SW_HTTP_FORM_FILE_DATA_FMT, (int)(sizeof(boundary_str) - 1),
                         boundary_str, (int)Z_STRLEN_P(zname), Z_STRVAL_P(zname), (int)Z_STRLEN_P(zfilename),
                         Z_STRVAL_P(zfilename), (int)Z_STRLEN_P(ztype), Z_STRVAL_P(ztype));
 
