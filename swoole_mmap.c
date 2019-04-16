@@ -32,8 +32,7 @@ static int mmap_stream_seek(php_stream *stream, off_t offset, int whence, off_t 
 static int mmap_stream_close(php_stream *stream, int close_handle);
 static PHP_METHOD(swoole_mmap, open);
 
-static zend_class_entry swoole_mmap_ce;
-zend_class_entry *swoole_mmap_ce_ptr;
+zend_class_entry *swoole_mmap_ce;
 static zend_object_handlers swoole_mmap_handlers;
 
 ZEND_BEGIN_ARG_INFO_EX(arginfo_swoole_mmap_open, 0, 0, 1)
@@ -147,10 +146,10 @@ static int mmap_stream_close(php_stream *stream, int close_handle)
 
 void swoole_mmap_init(int module_number)
 {
-    SWOOLE_INIT_CLASS_ENTRY(swoole_mmap, "Swoole\\Mmap", "swoole_mmap", NULL, swoole_mmap_methods);
-    SWOOLE_SET_CLASS_SERIALIZABLE(swoole_mmap, zend_class_serialize_deny, zend_class_unserialize_deny);
-    SWOOLE_SET_CLASS_CLONEABLE(swoole_mmap, zend_class_clone_deny);
-    SWOOLE_SET_CLASS_UNSET_PROPERTY_HANDLER(swoole_mmap, zend_class_unset_property_deny);
+    SW_INIT_CLASS_ENTRY(swoole_mmap, "Swoole\\Mmap", "swoole_mmap", NULL, swoole_mmap_methods);
+    SW_SET_CLASS_SERIALIZABLE(swoole_mmap, zend_class_serialize_deny, zend_class_unserialize_deny);
+    SW_SET_CLASS_CLONEABLE(swoole_mmap, zend_class_clone_deny);
+    SW_SET_CLASS_UNSET_PROPERTY_HANDLER(swoole_mmap, zend_class_unset_property_deny);
 }
 
 static PHP_METHOD(swoole_mmap, open)

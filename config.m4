@@ -74,7 +74,7 @@ if test "$PHP_SWOOLE_ASYNC" != "no"; then
 	swoole_channel.c \
 	swoole_mmap.c \
         swoole_memory_pool.c \
-        swoole_http_client.c"
+        swoole_http_client.cc"
 
     PHP_NEW_EXTENSION(swoole_async, $swoole_source_file, $ext_shared,,, cxx)
 

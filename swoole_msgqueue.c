@@ -24,8 +24,7 @@ static PHP_METHOD(swoole_msgqueue, setBlocking);
 static PHP_METHOD(swoole_msgqueue, stats);
 static PHP_METHOD(swoole_msgqueue, destroy);
 
-static zend_class_entry swoole_msgqueue_ce;
-zend_class_entry *swoole_msgqueue_ce_ptr;
+zend_class_entry *swoole_msgqueue_ce;
 static zend_object_handlers swoole_msgqueue_handlers;
 
 ZEND_BEGIN_ARG_INFO_EX(arginfo_swoole_msgqueue_construct, 0, 0, 1)
@@ -62,10 +61,10 @@ static const zend_function_entry swoole_msgqueue_methods[] =
 
 void swoole_msgqueue_init(int module_number)
 {
-    SWOOLE_INIT_CLASS_ENTRY(swoole_msgqueue, "Swoole\\MsgQueue", "swoole_msgqueue", NULL, swoole_msgqueue_methods);
-    SWOOLE_SET_CLASS_SERIALIZABLE(swoole_msgqueue, zend_class_serialize_deny, zend_class_unserialize_deny);
-    SWOOLE_SET_CLASS_CLONEABLE(swoole_msgqueue, zend_class_clone_deny);
-    SWOOLE_SET_CLASS_UNSET_PROPERTY_HANDLER(swoole_msgqueue, zend_class_unset_property_deny);
+    SW_INIT_CLASS_ENTRY(swoole_msgqueue, "Swoole\\MsgQueue", "swoole_msgqueue", NULL, swoole_msgqueue_methods);
+    SW_SET_CLASS_SERIALIZABLE(swoole_msgqueue, zend_class_serialize_deny, zend_class_unserialize_deny);
+    SW_SET_CLASS_CLONEABLE(swoole_msgqueue, zend_class_clone_deny);
+    SW_SET_CLASS_UNSET_PROPERTY_HANDLER(swoole_msgqueue, zend_class_unset_property_deny);
 }
 
 static PHP_METHOD(swoole_msgqueue, __construct)
@@ -81,12 +80,12 @@ static PHP_METHOD(swoole_msgqueue, __construct)
     swMsgQueue *queue = emalloc(sizeof(swMsgQueue));
     if (queue == NULL)
     {
-        zend_throw_exception(swoole_exception_ce_ptr, "failed to create MsgQueue.", SW_ERROR_MALLOC_FAIL);
+        zend_throw_exception(swoole_exception_ce, "failed to create MsgQueue.", SW_ERROR_MALLOC_FAIL);
         RETURN_FALSE;
     }
     if (swMsgQueue_create(queue, 1, key, perms))
     {
-        zend_throw_exception(swoole_exception_ce_ptr, "failed to init MsgQueue.", SW_ERROR_MALLOC_FAIL);
+        zend_throw_exception(swoole_exception_ce, "failed to init MsgQueue.", SW_ERROR_MALLOC_FAIL);
         RETURN_FALSE;
     }
     swoole_set_object(getThis(), queue);
@@ -94,7 +93,7 @@ static PHP_METHOD(swoole_msgqueue, __construct)
 
 static PHP_METHOD(swoole_msgqueue, __destruct)
 {
-    SW_PREVENT_USER_DESTRUCT;
+    SW_PREVENT_USER_DESTRUCT();
 
     swMsgQueue *queue = swoole_get_object(getThis());
     efree(queue);

@@ -27,8 +27,7 @@ static PHP_METHOD(swoole_ringqueue, count);
 static PHP_METHOD(swoole_ringqueue, isFull);
 static PHP_METHOD(swoole_ringqueue, isEmpty);
 
-static zend_class_entry swoole_ringqueue_ce;
-zend_class_entry *swoole_ringqueue_ce_ptr;
+zend_class_entry *swoole_ringqueue_ce;
 static zend_object_handlers swoole_ringqueue_handlers;
 
 ZEND_BEGIN_ARG_INFO_EX(arginfo_swoole_ringqueue_construct, 0, 0, 1)
@@ -56,10 +55,10 @@ static const zend_function_entry swoole_ringqueue_methods[] =
 
 void swoole_ringqueue_init(int module_number)
 {
-    SWOOLE_INIT_CLASS_ENTRY(swoole_ringqueue, "Swoole\\RingQueue", "swoole_ringqueue", NULL, swoole_ringqueue_methods);
-    SWOOLE_SET_CLASS_SERIALIZABLE(swoole_ringqueue, zend_class_serialize_deny, zend_class_unserialize_deny);
-    SWOOLE_SET_CLASS_CLONEABLE(swoole_ringqueue, zend_class_clone_deny);
-    SWOOLE_SET_CLASS_UNSET_PROPERTY_HANDLER(swoole_ringqueue, zend_class_unset_property_deny);
+    SW_INIT_CLASS_ENTRY(swoole_ringqueue, "Swoole\\RingQueue", "swoole_ringqueue", NULL, swoole_ringqueue_methods);
+    SW_SET_CLASS_SERIALIZABLE(swoole_ringqueue, zend_class_serialize_deny, zend_class_unserialize_deny);
+    SW_SET_CLASS_CLONEABLE(swoole_ringqueue, zend_class_clone_deny);
+    SW_SET_CLASS_UNSET_PROPERTY_HANDLER(swoole_ringqueue, zend_class_unset_property_deny);
 }
 
 static PHP_METHOD(swoole_ringqueue, __construct)
@@ -79,12 +78,12 @@ static PHP_METHOD(swoole_ringqueue, __construct)
     swRingQueue *queue = emalloc(sizeof(swRingQueue));
     if (queue == NULL)
     {
-        zend_throw_exception(swoole_exception_ce_ptr, "failed to create ringqueue.", SW_ERROR_MALLOC_FAIL);
+        zend_throw_exception(swoole_exception_ce, "failed to create ringqueue.", SW_ERROR_MALLOC_FAIL);
         RETURN_FALSE;
     }
     if (swRingQueue_init(queue, len))
     {
-        zend_throw_exception(swoole_exception_ce_ptr, "failed to init ringqueue.", SW_ERROR_MALLOC_FAIL);
+        zend_throw_exception(swoole_exception_ce, "failed to init ringqueue.", SW_ERROR_MALLOC_FAIL);
         RETURN_FALSE;
     }
     swoole_set_object(getThis(), queue);
@@ -92,7 +91,7 @@ static PHP_METHOD(swoole_ringqueue, __construct)
 
 static PHP_METHOD(swoole_ringqueue, __destruct)
 {
-    SW_PREVENT_USER_DESTRUCT;
+    SW_PREVENT_USER_DESTRUCT();
 
     swRingQueue *queue = swoole_get_object(getThis());
     efree(queue);

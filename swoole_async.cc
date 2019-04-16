@@ -139,8 +139,7 @@ static const zend_function_entry swoole_async_methods[] =
     PHP_FE_END
 };
 
-static zend_class_entry swoole_async_ce;
-static zend_class_entry *swoole_async_ce_ptr;
+static zend_class_entry *swoole_async_ce;
 static zend_object_handlers swoole_async_handlers;
 
 /* {{{ swoole_async_deps
@@ -184,10 +183,10 @@ static void php_swoole_file_request_free(void *data)
 
 void swoole_async_init(int module_number)
 {
-    SWOOLE_INIT_CLASS_ENTRY(swoole_async, "Swoole\\Async", "swoole_async", NULL, swoole_async_methods);
-    SWOOLE_SET_CLASS_SERIALIZABLE(swoole_async, zend_class_serialize_deny, zend_class_unserialize_deny);
-    SWOOLE_SET_CLASS_CLONEABLE(swoole_async, zend_class_clone_deny);
-    SWOOLE_SET_CLASS_UNSET_PROPERTY_HANDLER(swoole_async, zend_class_unset_property_deny);
+    SW_INIT_CLASS_ENTRY(swoole_async, "Swoole\\Async", "swoole_async", NULL, swoole_async_methods);
+    SW_SET_CLASS_SERIALIZABLE(swoole_async, zend_class_serialize_deny, zend_class_unserialize_deny);
+    SW_SET_CLASS_CLONEABLE(swoole_async, zend_class_clone_deny);
+    SW_SET_CLASS_UNSET_PROPERTY_HANDLER(swoole_async, zend_class_unset_property_deny);
 }
 
 static void php_swoole_dns_callback(char *domain, swDNSResolver_result *result, void *data)
@@ -869,8 +868,6 @@ PHP_FUNCTION(swoole_async_set)
         Z_PARAM_ARRAY(zset)
     ZEND_PARSE_PARAMETERS_END_EX(RETURN_FALSE);
 
-    php_swoole_array_separate(zset);
-
     vht = Z_ARRVAL_P(zset);
     if (php_swoole_array_get_value(vht, "enable_signalfd", v))
     {
@@ -936,7 +933,6 @@ PHP_FUNCTION(swoole_async_set)
         }
     }
 #endif
-    zval_ptr_dtor(zset);
 }
 
 PHP_FUNCTION(swoole_async_dns_lookup)
@@ -1170,8 +1166,6 @@ PHP_MINIT_FUNCTION(swoole_async)
  */
 PHP_MSHUTDOWN_FUNCTION(swoole_async)
 {
-    swoole_clean();
-
     return SUCCESS;
 }
 /* }}} */
