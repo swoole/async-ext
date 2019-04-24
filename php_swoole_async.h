@@ -25,6 +25,11 @@
 
 #include "ext/swoole/php_swoole.h"
 
+#ifndef SW_MYSQL_CONNECT_TIMEOUT
+#define SW_MYSQL_CONNECT_TIMEOUT         1.0
+#define SW_REDIS_CONNECT_TIMEOUT         1.0
+#endif
+
 BEGIN_EXTERN_C()
 
 PHP_MINIT_FUNCTION(swoole_async);
