@@ -56,7 +56,7 @@ void swoole_channel_init(int module_number)
     SW_INIT_CLASS_ENTRY(swoole_channel, "Swoole\\Channel", "swoole_channel", NULL, swoole_channel_methods);
     SW_SET_CLASS_SERIALIZABLE(swoole_channel, zend_class_serialize_deny, zend_class_unserialize_deny);
     SW_SET_CLASS_CLONEABLE(swoole_channel, zend_class_clone_deny);
-    SW_SET_CLASS_UNSET_PROPERTY_HANDLER(swoole_channel, zend_class_unset_property_deny);
+    SW_SET_CLASS_UNSET_PROPERTY_HANDLER(swoole_channel, sw_zend_class_unset_property_deny);
 }
 
 static PHP_METHOD(swoole_channel, __construct)

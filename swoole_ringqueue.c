@@ -58,7 +58,7 @@ void swoole_ringqueue_init(int module_number)
     SW_INIT_CLASS_ENTRY(swoole_ringqueue, "Swoole\\RingQueue", "swoole_ringqueue", NULL, swoole_ringqueue_methods);
     SW_SET_CLASS_SERIALIZABLE(swoole_ringqueue, zend_class_serialize_deny, zend_class_unserialize_deny);
     SW_SET_CLASS_CLONEABLE(swoole_ringqueue, zend_class_clone_deny);
-    SW_SET_CLASS_UNSET_PROPERTY_HANDLER(swoole_ringqueue, zend_class_unset_property_deny);
+    SW_SET_CLASS_UNSET_PROPERTY_HANDLER(swoole_ringqueue, sw_zend_class_unset_property_deny);
 }
 
 static PHP_METHOD(swoole_ringqueue, __construct)

@@ -102,12 +102,12 @@ void swoole_memory_pool_init(int module_number)
     SW_INIT_CLASS_ENTRY(swoole_memory_pool, "Swoole\\Memory\\Pool", "swoole_memory_pool", NULL, swoole_memory_pool_methods);
     SW_SET_CLASS_SERIALIZABLE(swoole_memory_pool, zend_class_serialize_deny, zend_class_unserialize_deny);
     SW_SET_CLASS_CLONEABLE(swoole_memory_pool, zend_class_clone_deny);
-    SW_SET_CLASS_UNSET_PROPERTY_HANDLER(swoole_memory_pool, zend_class_unset_property_deny);
+    SW_SET_CLASS_UNSET_PROPERTY_HANDLER(swoole_memory_pool, sw_zend_class_unset_property_deny);
 
     SW_INIT_CLASS_ENTRY(swoole_memory_pool_slice, "Swoole\\Memory\\Pool\\Slice", "swoole_memory_pool_slice", NULL, swoole_memory_pool_slice_methods);
     SW_SET_CLASS_SERIALIZABLE(swoole_memory_pool_slice, zend_class_serialize_deny, zend_class_unserialize_deny);
     SW_SET_CLASS_CLONEABLE(swoole_memory_pool_slice, zend_class_clone_deny);
-    SW_SET_CLASS_UNSET_PROPERTY_HANDLER(swoole_memory_pool_slice, zend_class_unset_property_deny);
+    SW_SET_CLASS_UNSET_PROPERTY_HANDLER(swoole_memory_pool_slice, sw_zend_class_unset_property_deny);
 
     zend_declare_class_constant_long(swoole_memory_pool_ce, ZEND_STRL("TYPE_RING"), memory_pool_type_ring);
     zend_declare_class_constant_long(swoole_memory_pool_ce, ZEND_STRL("TYPE_GLOBAL"), memory_pool_type_global);

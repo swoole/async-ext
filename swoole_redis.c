@@ -174,7 +174,7 @@ void swoole_redis_init(int module_number)
     SW_INIT_CLASS_ENTRY(swoole_redis, "Swoole\\Redis", "swoole_redis", NULL, swoole_redis_methods);
     SW_SET_CLASS_SERIALIZABLE(swoole_redis, zend_class_serialize_deny, zend_class_unserialize_deny);
     SW_SET_CLASS_CLONEABLE(swoole_redis, zend_class_clone_deny);
-    SW_SET_CLASS_UNSET_PROPERTY_HANDLER(swoole_redis, zend_class_unset_property_deny);
+    SW_SET_CLASS_UNSET_PROPERTY_HANDLER(swoole_redis, sw_zend_class_unset_property_deny);
 
     zend_declare_property_null(swoole_redis_ce, ZEND_STRL("onConnect"), ZEND_ACC_PUBLIC);
     zend_declare_property_null(swoole_redis_ce, ZEND_STRL("onClose"), ZEND_ACC_PUBLIC);
