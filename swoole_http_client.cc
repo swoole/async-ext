@@ -1199,7 +1199,7 @@ static int http_client_send_http_request(zval *zobject)
                 {
                     goto send_fail;
                 }
-                if ((ret = http->cli->send(http->cli, "\r\n", 2, 0)) < 0)
+                if ((ret = http->cli->send(http->cli, (char *) "\r\n", 2, 0)) < 0)
                 {
                     goto send_fail;
                 }
