@@ -520,7 +520,7 @@ void swoole_http_client_init(int module_number)
     SW_INIT_CLASS_ENTRY(swoole_http_client, "Swoole\\Http\\Client", "swoole_http_client", NULL, swoole_http_client_methods);
     SW_SET_CLASS_SERIALIZABLE(swoole_http_client, zend_class_serialize_deny, zend_class_unserialize_deny);
     SW_SET_CLASS_CLONEABLE(swoole_http_client, zend_class_clone_deny);
-    SW_SET_CLASS_UNSET_PROPERTY_HANDLER(swoole_http_client, sw_zend_class_unset_property_deny);
+    SW_SET_CLASS_UNSET_PROPERTY_HANDLER(swoole_http_client, zend_class_unset_property_deny);
 
     zend_declare_property_long(swoole_http_client_ce, ZEND_STRL("type"), 0, ZEND_ACC_PUBLIC);
     zend_declare_property_long(swoole_http_client_ce, ZEND_STRL("errCode"), 0, ZEND_ACC_PUBLIC);
@@ -699,7 +699,7 @@ static void http_client_onRequestTimeout(swTimer *timer, swTimer_node *tnode)
 
     if (cli->buffer && cli->buffer->length > 0) // received something bug not complete
     {
-        zval *zheaders = sw_zend_read_and_convert_property_array(swoole_http_client_ce, zobject, ZEND_STRL("requestHeaders"), 1);
+        zval *zheaders = sw_zend_read_property_array(swoole_http_client_ce, zobject, ZEND_STRL("requestHeaders"), 1);
         zval *v;
         if (php_swoole_array_get_value(Z_ARRVAL_P(zheaders), "Connection", v))
         {
@@ -1520,7 +1520,7 @@ static PHP_METHOD(swoole_http_client, set)
         RETURN_FALSE;
     }
 
-    zval *zsetting = sw_zend_read_and_convert_property_array(swoole_http_client_ce, getThis(), ZEND_STRL("setting"), 1);
+    zval *zsetting = sw_zend_read_property_array(swoole_http_client_ce, getThis(), ZEND_STRL("setting"), 1);
     php_array_merge(Z_ARRVAL_P(zsetting), Z_ARRVAL_P(zset));
 
     RETURN_TRUE;
@@ -1534,7 +1534,7 @@ static PHP_METHOD(swoole_http_client, setHeaders)
         RETURN_FALSE;
     }
 
-    zval *zheaders = sw_zend_read_and_convert_property_array(swoole_http_client_ce, getThis(), ZEND_STRL("requestHeaders"), 1);
+    zval *zheaders = sw_zend_read_property_array(swoole_http_client_ce, getThis(), ZEND_STRL("requestHeaders"), 1);
     php_array_merge(Z_ARRVAL_P(zheaders), Z_ARRVAL_P(headers));
 
     RETURN_TRUE;
@@ -1548,7 +1548,7 @@ static PHP_METHOD(swoole_http_client, setCookies)
         RETURN_FALSE;
     }
 
-    zval *zcookies = sw_zend_read_and_convert_property_array(swoole_http_client_ce, getThis(), ZEND_STRL("cookies"), 1);
+    zval *zcookies = sw_zend_read_property_array(swoole_http_client_ce, getThis(), ZEND_STRL("cookies"), 1);
     php_array_merge(Z_ARRVAL_P(zcookies), Z_ARRVAL_P(cookies));
 
     RETURN_TRUE;
@@ -1567,7 +1567,7 @@ static PHP_METHOD(swoole_http_client, setData)
     }
     if (Z_TYPE_P(data) == IS_ARRAY)
     {
-        zval *zbody = sw_zend_read_and_convert_property_array(swoole_http_client_ce, getThis(), ZEND_STRL("requestBody"), 1);
+        zval *zbody = sw_zend_read_property_array(swoole_http_client_ce, getThis(), ZEND_STRL("requestBody"), 1);
         php_array_merge(Z_ARRVAL_P(zbody), Z_ARRVAL_P(data));
     }
     else
@@ -1822,7 +1822,7 @@ static int http_client_parser_on_header_value(swoole_http_parser *parser, const 
 {
     http_client* http = (http_client*) parser->data;
     zval* zobject = (zval*) http->object;
-    zval *zheaders = sw_zend_read_and_convert_property_array(Z_OBJCE_P(zobject), zobject, ZEND_STRL("headers"), 1);
+    zval *zheaders = sw_zend_read_property_array(Z_OBJCE_P(zobject), zobject, ZEND_STRL("headers"), 1);
 
     char *header_name = zend_str_tolower_dup(http->tmp_header_field_name, http->tmp_header_field_name_len);
     add_assoc_stringl_ex(zheaders, header_name, http->tmp_header_field_name_len, (char *) at, length);
@@ -1834,8 +1834,8 @@ static int http_client_parser_on_header_value(swoole_http_parser *parser, const 
     }
     else if (strcasecmp(header_name, "Set-Cookie") == 0)
     {
-        zval *zcookies = sw_zend_read_and_convert_property_array(Z_OBJCE_P(zobject), zobject, ZEND_STRL("cookies"), 1);
-        zval *zset_cookie_headers = sw_zend_read_and_convert_property_array(Z_OBJCE_P(zobject), zobject, ZEND_STRL("set_cookie_headers"), 1);
+        zval *zcookies = sw_zend_read_property_array(Z_OBJCE_P(zobject), zobject, ZEND_STRL("cookies"), 1);
+        zval *zset_cookie_headers = sw_zend_read_property_array(Z_OBJCE_P(zobject), zobject, ZEND_STRL("set_cookie_headers"), 1);
         if (SW_OK != http_parse_set_cookies(at, length, zcookies, zset_cookie_headers))
         {
             efree(header_name);
@@ -2090,7 +2090,7 @@ static PHP_METHOD(swoole_http_client, post)
     }
     if (Z_TYPE_P(data) == IS_ARRAY)
     {
-        zval *zbody = sw_zend_read_and_convert_property_array(swoole_http_client_ce, getThis(), ZEND_STRL("requestBody"), 1);
+        zval *zbody = sw_zend_read_property_array(swoole_http_client_ce, getThis(), ZEND_STRL("requestBody"), 1);
         php_array_merge(Z_ARRVAL_P(zbody), Z_ARRVAL_P(data));
     }
     else
@@ -2125,7 +2125,7 @@ static PHP_METHOD(swoole_http_client, upgrade)
         return;
     }
 
-    zval *zheaders = sw_zend_read_and_convert_property_array(swoole_http_client_ce, getThis(), ZEND_STRL("requestHeaders"), 1);
+    zval *zheaders = sw_zend_read_property_array(swoole_http_client_ce, getThis(), ZEND_STRL("requestHeaders"), 1);
 
     char buf[SW_WEBSOCKET_KEY_LENGTH + 1];
     http_client_create_token(SW_WEBSOCKET_KEY_LENGTH, buf);
