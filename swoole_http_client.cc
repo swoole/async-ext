@@ -130,7 +130,7 @@ static void http_client_onClose(swClient *cli);
 static void http_client_onError(swClient *cli);
 static void http_client_onRequestTimeout(swTimer *timer, swTimer_node *tnode);
 static void http_client_onResponseException(zval *zobject);
-static int http_client_onMessage(swConnection *conn, char *data, uint32_t length);
+static int http_client_onMessage(swProtocol *proto, swConnection *conn, char *data, uint32_t length);
 
 static int http_client_send_http_request(zval *zobject);
 static int http_client_execute(zval *zobject, char *uri, size_t uri_len, zval *callback);
@@ -641,7 +641,7 @@ static void http_client_onClose(swClient *cli)
     zval_ptr_dtor(zobject);
 }
 
-static int http_client_onMessage(swConnection *conn, char *data, uint32_t length)
+static int http_client_onMessage(swProtocol *proto, swConnection *conn, char *data, uint32_t length)
 {
     swClient *cli = (swClient *) conn->object;
     zval *zobject = (zval *) cli->object;

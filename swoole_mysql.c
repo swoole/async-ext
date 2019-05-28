@@ -317,18 +317,18 @@ static int mysql_auth_encrypt_dispatch(char *buf, char *auth_plugin_name, char *
         // auth-response
         char hash_0[20];
         bzero(hash_0, sizeof (hash_0));
-        php_swoole_sha1(password, password_len, (uchar *) hash_0);
+        swoole_sha1(password, password_len, (uchar *) hash_0);
 
         char hash_1[20];
         bzero(hash_1, sizeof (hash_1));
-        php_swoole_sha1(hash_0, sizeof (hash_0), (uchar *) hash_1);
+        swoole_sha1(hash_0, sizeof (hash_0), (uchar *) hash_1);
 
         char str[40];
         memcpy(str, nonce, 20);
         memcpy(str + 20, hash_1, 20);
 
         char hash_2[20];
-        php_swoole_sha1(str, sizeof (str), (uchar *) hash_2);
+        swoole_sha1(str, sizeof (str), (uchar *) hash_2);
 
         char hash_3[20];
 
