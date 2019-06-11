@@ -909,7 +909,7 @@ static int swoole_redis_onError(swReactor *reactor, swEvent *event)
         zval args[2];
 
         args[0] = *redis->object;
-        ZVAL_BOOL(&args[1], 0);
+        ZVAL_FALSE(&args[1]);
 
         redis->connecting = 1;
         if (sw_call_user_function_ex(EG(function_table), NULL, zcallback, NULL, 2, args, 0, NULL) != SUCCESS)

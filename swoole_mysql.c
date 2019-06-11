@@ -2432,7 +2432,8 @@ static PHP_METHOD(swoole_mysql, connect)
     _socket->object = client;
     _socket->active = 0;
 
-    _return: if (str_host)
+    _return:
+    if (str_host)
     {
         zend_string_release(str_host);
     }
@@ -2775,12 +2776,12 @@ static void swoole_mysql_onConnect(mysql_client *client)
     {
         zend_update_property_stringl(swoole_mysql_ce, zobject, ZEND_STRL("connect_error"), client->connector.error_msg, client->connector.error_length);
         zend_update_property_long(swoole_mysql_ce, zobject, ZEND_STRL("connect_errno"), client->connector.error_code);
-        ZVAL_BOOL(&args[1], 0);
+        ZVAL_FALSE(&args[1]);
     }
     else
     {
         zend_update_property_bool(swoole_mysql_ce, zobject, ZEND_STRL("connected"), 1);
-        ZVAL_BOOL(&args[1], 1);
+        ZVAL_TRUE(&args[1]);
         client->connected = 1;
     }
 
@@ -3083,13 +3084,13 @@ static int swoole_mysql_onRead(swReactor *reactor, swEvent *event)
             if (client->response.response_type == SW_MYSQL_PACKET_OK)
             {
                 result = sw_malloc_zval();
-                ZVAL_BOOL(result, 1);
+                ZVAL_TRUE(result);
             }
             //ERROR
             else if (client->response.response_type == SW_MYSQL_PACKET_ERR)
             {
                 result = sw_malloc_zval();
-                ZVAL_BOOL(result, 0);
+                ZVAL_FALSE(result);
 
                 zend_update_property_stringl(swoole_mysql_ce, zobject, ZEND_STRL("error"), client->response.server_msg, client->response.l_server_msg);
                 zend_update_property_long(swoole_mysql_ce, zobject, ZEND_STRL("errno"), client->response.error_code);

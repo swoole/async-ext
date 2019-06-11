@@ -30,6 +30,26 @@
 #define SW_REDIS_CONNECT_TIMEOUT         1.0
 #endif
 
+static sw_inline enum swBool_type php_swoole_is_callable(zval *callback)
+{
+    if (!callback || ZVAL_IS_NULL(callback))
+    {
+        return SW_FALSE;
+    }
+    char *func_name = NULL;
+    if (!sw_zend_is_callable(callback, 0, &func_name))
+    {
+        swoole_php_fatal_error(E_WARNING, "function '%s' is not callable", func_name);
+        efree(func_name);
+        return SW_FALSE;
+    }
+    else
+    {
+        efree(func_name);
+        return SW_TRUE;
+    }
+}
+
 BEGIN_EXTERN_C()
 
 PHP_MINIT_FUNCTION(swoole_async);
