@@ -50,6 +50,19 @@ static sw_inline enum swBool_type php_swoole_is_callable(zval *callback)
     }
 }
 
+static sw_inline int sw_call_user_function_ex(HashTable *function_table, zval* object_p, zval *function_name, zval **retval_ptr_ptr, uint32_t param_count, zval *params, int no_separation, HashTable* ymbol_table)
+{
+    static zval _retval;
+    int ret;
+    *retval_ptr_ptr = &_retval;
+    ret = call_user_function_ex(function_table, object_p, function_name, &_retval, param_count, param_count ? params : NULL, no_separation, ymbol_table);
+    if (UNEXPECTED(EG(exception)))
+    {
+        zend_exception_error(EG(exception), E_ERROR);
+    }
+    return ret;
+}
+
 BEGIN_EXTERN_C()
 
 PHP_MINIT_FUNCTION(swoole_async);
