@@ -223,7 +223,7 @@ static void php_swoole_dns_callback(char *domain, swDNSResolver_result *result, 
     zval *zcallback = req->callback;
     if (sw_call_user_function_ex(EG(function_table), NULL, zcallback, &retval, 2, args, 0, NULL) == FAILURE)
     {
-        swoole_php_fatal_error(E_WARNING, "swoole_asyns_dns_lookup handler error.");
+        php_swoole_fatal_error(E_WARNING, "swoole_asyns_dns_lookup handler error.");
         return;
     }
     if (UNEXPECTED(EG(exception)))
@@ -258,7 +258,7 @@ static void aio_onDNSCompleted(swAio_event *event)
     if (ret < 0)
     {
         SwooleG.error = event->error;
-        swoole_php_error(E_WARNING, "Aio Error: %s[%d]", strerror(event->error), event->error);
+        php_swoole_error(E_WARNING, "Aio Error: %s[%d]", strerror(event->error), event->error);
     }
 
     args[0] = *dns_req->domain;
@@ -274,7 +274,7 @@ static void aio_onDNSCompleted(swAio_event *event)
 
     if (sw_call_user_function_ex(EG(function_table), NULL, zcallback, &retval, 2, args, 0, NULL) == FAILURE)
     {
-        swoole_php_fatal_error(E_WARNING, "swoole_async: onAsyncComplete handler error");
+        php_swoole_fatal_error(E_WARNING, "swoole_async: onAsyncComplete handler error");
         return;
     }
     if (UNEXPECTED(EG(exception)))
@@ -315,7 +315,7 @@ static void aio_onFileCompleted(swAio_event *event)
     if (ret < 0)
     {
         SwooleG.error = event->error;
-        swoole_php_error(E_WARNING, "Aio Error: %s[%d]", strerror(event->error), event->error);
+        php_swoole_error(E_WARNING, "Aio Error: %s[%d]", strerror(event->error), event->error);
     }
     else
     {
@@ -326,7 +326,7 @@ static void aio_onFileCompleted(swAio_event *event)
         }
         else if (file_req->once == 1 && ret < file_req->length)
         {
-            swoole_php_fatal_error(E_WARNING, "ret_length[%d] < req->length[%d].", (int ) ret, file_req->length);
+            php_swoole_fatal_error(E_WARNING, "ret_length[%d] < req->length[%d].", (int ) ret, file_req->length);
         }
         else if (event->type == SW_AIO_READ)
         {
@@ -355,7 +355,7 @@ static void aio_onFileCompleted(swAio_event *event)
     }
     else
     {
-        swoole_php_fatal_error(E_WARNING, "swoole_async: onFileCompleted unknown event type[%d].", event->type);
+        php_swoole_fatal_error(E_WARNING, "swoole_async: onFileCompleted unknown event type[%d].", event->type);
         return;
     }
 
@@ -363,7 +363,7 @@ static void aio_onFileCompleted(swAio_event *event)
     {
         if (sw_call_user_function_ex(EG(function_table), NULL, zcallback, &retval, 2, args, 0, NULL) == FAILURE)
         {
-            swoole_php_fatal_error(E_WARNING, "swoole_async: onAsyncComplete handler error");
+            php_swoole_fatal_error(E_WARNING, "swoole_async: onAsyncComplete handler error");
             return;
         }
         if (UNEXPECTED(EG(exception)))
@@ -436,7 +436,7 @@ static void aio_onFileCompleted(swAio_event *event)
             int ret = swAio_dispatch(&ev);
             if (ret < 0)
             {
-                swoole_php_fatal_error(E_WARNING, "swoole_async: continue to read failed. Error: %s[%d]", strerror(event->error), event->error);
+                php_swoole_fatal_error(E_WARNING, "swoole_async: continue to read failed. Error: %s[%d]", strerror(event->error), event->error);
                 goto close_file;
             }
         }
@@ -471,7 +471,7 @@ PHP_FUNCTION(swoole_async_read)
 
     if (offset < 0)
     {
-        swoole_php_fatal_error(E_WARNING, "offset must be greater than 0.");
+        php_swoole_fatal_error(E_WARNING, "offset must be greater than 0.");
         RETURN_FALSE;
     }
     if (!php_swoole_is_callable(callback))
@@ -487,20 +487,20 @@ PHP_FUNCTION(swoole_async_read)
     int fd = open(str_filename.val(), open_flag, 0644);
     if (fd < 0)
     {
-        swoole_php_sys_error(E_WARNING, "open(%s, O_RDONLY) failed.", str_filename.val());
+        php_swoole_sys_error(E_WARNING, "open(%s, O_RDONLY) failed.", str_filename.val());
         RETURN_FALSE;
     }
 
     struct stat file_stat;
     if (fstat(fd, &file_stat) < 0)
     {
-        swoole_php_sys_error(E_WARNING, "fstat(%s) failed.", str_filename.val());
+        php_swoole_sys_error(E_WARNING, "fstat(%s) failed.", str_filename.val());
         close(fd);
         RETURN_FALSE;
     }
     if (offset >= file_stat.st_size)
     {
-        swoole_php_fatal_error(E_WARNING, "offset must be less than file_size[=%jd].", (intmax_t) file_stat.st_size);
+        php_swoole_fatal_error(E_WARNING, "offset must be less than file_size[=%jd].", (intmax_t) file_stat.st_size);
         close(fd);
         RETURN_FALSE;
     }
@@ -508,7 +508,7 @@ PHP_FUNCTION(swoole_async_read)
     void *fcnt = emalloc(buf_size);
     if (fcnt == NULL)
     {
-        swoole_php_sys_error(E_WARNING, "malloc failed.");
+        php_swoole_sys_error(E_WARNING, "malloc failed.");
         close(fd);
         RETURN_FALSE;
     }
@@ -603,7 +603,7 @@ PHP_FUNCTION(swoole_async_write)
         fd = open(str_filename.val(), open_flag, 0644);
         if (fd < 0)
         {
-            swoole_php_fatal_error(E_WARNING, "open(%s, %d) failed. Error: %s[%d]", str_filename.val(), open_flag, strerror(errno), errno);
+            php_swoole_fatal_error(E_WARNING, "open(%s, %d) failed. Error: %s[%d]", str_filename.val(), open_flag, strerror(errno), errno);
             RETURN_FALSE;
         }
         swTraceLog(SW_TRACE_AIO, "open write file fd#%d", fd);
@@ -681,7 +681,7 @@ PHP_FUNCTION(swoole_async_readfile)
     int fd = open(str_filename.val(), open_flag, 0644);
     if (fd < 0)
     {
-        swoole_php_fatal_error(E_WARNING, "open file[%s] failed. Error: %s[%d]", str_filename.val(), strerror(errno), errno);
+        php_swoole_fatal_error(E_WARNING, "open file[%s] failed. Error: %s[%d]", str_filename.val(), strerror(errno), errno);
         RETURN_FALSE;
     }
     if (!php_swoole_is_callable(callback))
@@ -693,19 +693,19 @@ PHP_FUNCTION(swoole_async_readfile)
     struct stat file_stat;
     if (fstat(fd, &file_stat) < 0)
     {
-        swoole_php_fatal_error(E_WARNING, "fstat failed. Error: %s[%d]", strerror(errno), errno);
+        php_swoole_fatal_error(E_WARNING, "fstat failed. Error: %s[%d]", strerror(errno), errno);
         close(fd);
         RETURN_FALSE;
     }
     if (file_stat.st_size <= 0)
     {
-        swoole_php_fatal_error(E_WARNING, "file is empty.");
+        php_swoole_fatal_error(E_WARNING, "file is empty.");
         close(fd);
         RETURN_FALSE;
     }
     if (file_stat.st_size > SW_AIO_MAX_FILESIZE)
     {
-        swoole_php_fatal_error(E_WARNING, "file_size[size=%ld|max_size=%d] is too big. Please use swoole_async_read.",
+        php_swoole_fatal_error(E_WARNING, "file_size[size=%ld|max_size=%d] is too big. Please use swoole_async_read.",
                 (long int) file_stat.st_size, SW_AIO_MAX_FILESIZE);
         close(fd);
         RETURN_FALSE;
@@ -779,7 +779,7 @@ PHP_FUNCTION(swoole_async_writefile)
     }
     if (fcnt_len > SW_AIO_MAX_FILESIZE)
     {
-        swoole_php_fatal_error(
+        php_swoole_fatal_error(
             E_WARNING, "file_size[size=%zu|max_size=%d] is too big. Please use swoole_async_write.",
             fcnt_len, SW_AIO_MAX_FILESIZE
         );
@@ -797,7 +797,7 @@ PHP_FUNCTION(swoole_async_writefile)
     int fd = open(str_filename.val(), open_flag, 0644);
     if (fd < 0)
     {
-        swoole_php_fatal_error(E_WARNING, "open file failed. Error: %s[%d]", strerror(errno), errno);
+        php_swoole_fatal_error(E_WARNING, "open file failed. Error: %s[%d]", strerror(errno), errno);
         RETURN_FALSE;
     }
 
@@ -856,7 +856,7 @@ PHP_FUNCTION(swoole_async_set)
 {
     if (SwooleG.main_reactor != NULL)
     {
-        swoole_php_fatal_error(E_ERROR, "eventLoop has already been created. unable to change settings.");
+        php_swoole_fatal_error(E_ERROR, "eventLoop has already been created. unable to change settings.");
         RETURN_FALSE;
     }
 
@@ -947,13 +947,13 @@ PHP_FUNCTION(swoole_async_dns_lookup)
 
     if (Z_TYPE_P(domain) != IS_STRING)
     {
-        swoole_php_fatal_error(E_WARNING, "invalid domain name.");
+        php_swoole_fatal_error(E_WARNING, "invalid domain name.");
         RETURN_FALSE;
     }
 
     if (Z_STRLEN_P(domain) == 0)
     {
-        swoole_php_fatal_error(E_WARNING, "domain name empty.");
+        php_swoole_fatal_error(E_WARNING, "domain name empty.");
         RETURN_FALSE;
     }
 
@@ -1066,7 +1066,7 @@ static int process_stream_onRead(swReactor *reactor, swEvent *event)
     zval *zcallback = ps->callback;
     if (sw_call_user_function_ex(EG(function_table), NULL, zcallback, &retval, 2, args, 0, NULL) == FAILURE)
     {
-        swoole_php_fatal_error(E_WARNING, "swoole_async::exec callback error");
+        php_swoole_fatal_error(E_WARNING, "swoole_async::exec callback error");
     }
     sw_zval_free(zcallback);
 
@@ -1108,7 +1108,7 @@ PHP_METHOD(swoole_async, exec)
     int fd = swoole_shell_exec(command, &pid, 0);
     if (fd < 0)
     {
-        swoole_php_error(E_WARNING, "Unable to execute '%s'", command);
+        php_swoole_error(E_WARNING, "Unable to execute '%s'", command);
         RETURN_FALSE;
     }
 

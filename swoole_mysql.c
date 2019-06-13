@@ -2131,18 +2131,18 @@ static int mysql_query(zval *zobject, mysql_client *client, swString *sql, zval 
     if (!client->cli)
     {
         SwooleG.error = SW_ERROR_CLIENT_NO_CONNECTION;
-        swoole_php_fatal_error(E_WARNING, "mysql connection#%d is closed.", client->fd);
+        php_swoole_fatal_error(E_WARNING, "mysql connection#%d is closed.", client->fd);
         return SW_ERR;
     }
     if (!client->connected)
     {
         SwooleG.error = SW_ERROR_CLIENT_NO_CONNECTION;
-        swoole_php_error(E_WARNING, "mysql client is not connected to server.");
+        php_swoole_error(E_WARNING, "mysql client is not connected to server.");
         return SW_ERR;
     }
     if (client->state != SW_MYSQL_STATE_QUERY)
     {
-        swoole_php_fatal_error(E_WARNING, "mysql client is waiting response, cannot send new sql query.");
+        php_swoole_fatal_error(E_WARNING, "mysql client is waiting response, cannot send new sql query.");
         return SW_ERR;
     }
 
@@ -2245,7 +2245,7 @@ static PHP_METHOD(swoole_mysql, connect)
     mysql_client *client = swoole_get_object(getThis());
     if (client->cli)
     {
-        swoole_php_error(E_WARNING, "The mysql client is already connected server.");
+        php_swoole_error(E_WARNING, "The mysql client is already connected server.");
         RETURN_FALSE;
     }
 
@@ -2385,7 +2385,7 @@ static PHP_METHOD(swoole_mysql, connect)
         int tcp_nodelay = 1;
         if (setsockopt(cli->socket->fd, IPPROTO_TCP, TCP_NODELAY, (const void *) &tcp_nodelay, sizeof(int)) != 0)
         {
-            swoole_php_sys_error(E_WARNING, "setsockopt(%d, IPPROTO_TCP, TCP_NODELAY) failed.", cli->socket->fd);
+            php_swoole_sys_error(E_WARNING, "setsockopt(%d, IPPROTO_TCP, TCP_NODELAY) failed.", cli->socket->fd);
         }
     }
     //connect to mysql server
@@ -2474,14 +2474,14 @@ static PHP_METHOD(swoole_mysql, query)
 
     if (sql.length <= 0)
     {
-        swoole_php_fatal_error(E_WARNING, "Query is empty.");
+        php_swoole_fatal_error(E_WARNING, "Query is empty.");
         RETURN_FALSE;
     }
 
     mysql_client *client = swoole_get_object(getThis());
     if (!client)
     {
-        swoole_php_fatal_error(E_WARNING, "object is not instanceof swoole_mysql.");
+        php_swoole_fatal_error(E_WARNING, "object is not instanceof swoole_mysql.");
         RETURN_FALSE;
     }
 
@@ -2504,7 +2504,7 @@ static PHP_METHOD(swoole_mysql, begin)
     mysql_client *client = swoole_get_object(getThis());
     if (!client)
     {
-        swoole_php_fatal_error(E_WARNING, "object is not instanceof swoole_mysql.");
+        php_swoole_fatal_error(E_WARNING, "object is not instanceof swoole_mysql.");
         RETURN_FALSE;
     }
     if (client->transaction)
@@ -2543,7 +2543,7 @@ static PHP_METHOD(swoole_mysql, commit)
     mysql_client *client = swoole_get_object(getThis());
     if (!client)
     {
-        swoole_php_fatal_error(E_WARNING, "object is not instanceof swoole_mysql.");
+        php_swoole_fatal_error(E_WARNING, "object is not instanceof swoole_mysql.");
         RETURN_FALSE;
     }
     if (!client->transaction)
@@ -2583,7 +2583,7 @@ static PHP_METHOD(swoole_mysql, rollback)
     mysql_client *client = swoole_get_object(getThis());
     if (!client)
     {
-        swoole_php_fatal_error(E_WARNING, "object is not instanceof swoole_mysql.");
+        php_swoole_fatal_error(E_WARNING, "object is not instanceof swoole_mysql.");
         RETURN_FALSE;
     }
     if (!client->transaction)
@@ -2635,7 +2635,7 @@ static PHP_METHOD(swoole_mysql, close)
     mysql_client *client = swoole_get_object(getThis());
     if (!client)
     {
-        swoole_php_fatal_error(E_WARNING, "object is not instanceof swoole_mysql.");
+        php_swoole_fatal_error(E_WARNING, "object is not instanceof swoole_mysql.");
         RETURN_FALSE;
     }
 
@@ -2668,7 +2668,7 @@ static PHP_METHOD(swoole_mysql, close)
         args[0] = *object;
         if (sw_call_user_function_ex(EG(function_table), NULL, client->onClose, &retval, 1, args, 0, NULL) != SUCCESS)
         {
-            swoole_php_fatal_error(E_WARNING, "swoole_mysql onClose callback error.");
+            php_swoole_fatal_error(E_WARNING, "swoole_mysql onClose callback error.");
         }
         if (UNEXPECTED(EG(exception)))
         {
@@ -2700,7 +2700,7 @@ static PHP_METHOD(swoole_mysql, on)
     mysql_client *client = swoole_get_object(getThis());
     if (!client)
     {
-        swoole_php_fatal_error(E_WARNING, "object is not instanceof swoole_mysql.");
+        php_swoole_fatal_error(E_WARNING, "object is not instanceof swoole_mysql.");
         RETURN_FALSE;
     }
 
@@ -2712,7 +2712,7 @@ static PHP_METHOD(swoole_mysql, on)
     }
     else
     {
-        swoole_php_error(E_WARNING, "Unknown event type[%s]", name);
+        php_swoole_error(E_WARNING, "Unknown event type[%s]", name);
         RETURN_FALSE;
     }
     RETURN_TRUE;
@@ -2723,7 +2723,7 @@ static PHP_METHOD(swoole_mysql, getState)
     mysql_client *client = swoole_get_object(getThis());
     if (!client)
     {
-        swoole_php_fatal_error(E_WARNING, "object is not instanceof swoole_mysql.");
+        php_swoole_fatal_error(E_WARNING, "object is not instanceof swoole_mysql.");
         RETURN_FALSE;
     }
     RETURN_LONG(client->state);
@@ -2789,7 +2789,7 @@ static void swoole_mysql_onConnect(mysql_client *client)
 
     if (sw_call_user_function_ex(EG(function_table), NULL, zcallback, NULL, 2, args, 0, NULL) != SUCCESS)
     {
-        swoole_php_fatal_error(E_WARNING, "swoole_mysql onConnect handler error.");
+        php_swoole_fatal_error(E_WARNING, "swoole_mysql onConnect handler error.");
     }
     if (UNEXPECTED(EG(exception)))
     {
@@ -3064,7 +3064,7 @@ static int swoole_mysql_onRead(swReactor *reactor, swEvent *event)
             {
                 if (swString_extend(buffer, buffer->size * 2) < 0)
                 {
-                    swoole_php_fatal_error(E_ERROR, "malloc failed.");
+                    php_swoole_fatal_error(E_ERROR, "malloc failed.");
                     reactor->del(SwooleG.main_reactor, event->fd);
                 }
                 continue;
@@ -3106,7 +3106,7 @@ static int swoole_mysql_onRead(swReactor *reactor, swEvent *event)
             callback = client->callback;
             if (sw_call_user_function_ex(EG(function_table), NULL, callback, NULL, 2, args, 0, NULL) != SUCCESS)
             {
-                swoole_php_fatal_error(E_WARNING, "swoole_async_mysql callback[2] handler error.");
+                php_swoole_fatal_error(E_WARNING, "swoole_async_mysql callback[2] handler error.");
                 reactor->del(SwooleG.main_reactor, event->fd);
             }
             if (UNEXPECTED(EG(exception)))
@@ -3146,39 +3146,39 @@ static PHP_METHOD(swoole_mysql, escape)
 
     if (str.length <= 0)
     {
-        swoole_php_fatal_error(E_WARNING, "String is empty.");
+        php_swoole_fatal_error(E_WARNING, "String is empty.");
         RETURN_FALSE;
     }
 
     mysql_client *client = swoole_get_object(getThis());
     if (!client)
     {
-        swoole_php_fatal_error(E_WARNING, "object is not instanceof swoole_mysql.");
+        php_swoole_fatal_error(E_WARNING, "object is not instanceof swoole_mysql.");
         RETURN_FALSE;
     }
     if (!client->cli)
     {
-        swoole_php_fatal_error(E_WARNING, "mysql connection#%d is closed.", client->fd);
+        php_swoole_fatal_error(E_WARNING, "mysql connection#%d is closed.", client->fd);
         RETURN_FALSE;
     }
 
     char *newstr = safe_emalloc(2, str.length + 1, 1);
     if (newstr == NULL)
     {
-        swoole_php_fatal_error(E_ERROR, "emalloc(%ld) failed.", str.length + 1);
+        php_swoole_fatal_error(E_ERROR, "emalloc(%ld) failed.", str.length + 1);
         RETURN_FALSE;
     }
 
     const MYSQLND_CHARSET* cset = mysqlnd_find_charset_nr(client->connector.character_set);
     if (cset == NULL)
     {
-        swoole_php_fatal_error(E_ERROR, "unknown mysql charset[%d].", client->connector.character_set);
+        php_swoole_fatal_error(E_ERROR, "unknown mysql charset[%d].", client->connector.character_set);
         RETURN_FALSE;
     }
     int newstr_len = mysqlnd_cset_escape_slashes(cset, newstr, str.str, str.length);
     if (newstr_len < 0)
     {
-        swoole_php_fatal_error(E_ERROR, "mysqlnd_cset_escape_slashes() failed.");
+        php_swoole_fatal_error(E_ERROR, "mysqlnd_cset_escape_slashes() failed.");
         RETURN_FALSE;
     }
     RETVAL_STRINGL(newstr, newstr_len);

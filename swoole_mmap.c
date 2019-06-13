@@ -166,14 +166,14 @@ static PHP_METHOD(swoole_mmap, open)
 
     if (l_filename == 0)
     {
-        swoole_php_fatal_error(E_WARNING, "file name is required.");
+        php_swoole_fatal_error(E_WARNING, "file name is required.");
         RETURN_FALSE;
     }
 
     int fd;
     if ((fd = open(filename, O_RDWR)) < 0)
     {
-        swoole_php_sys_error(E_WARNING, "open(%s, O_RDWR) failed.", filename);
+        php_swoole_sys_error(E_WARNING, "open(%s, O_RDWR) failed.", filename);
         RETURN_FALSE;
     }
 
@@ -182,13 +182,13 @@ static PHP_METHOD(swoole_mmap, open)
         struct stat _stat;
         if (fstat(fd, &_stat) < 0)
         {
-            swoole_php_sys_error(E_WARNING, "fstat(%s) failed.", filename);
+            php_swoole_sys_error(E_WARNING, "fstat(%s) failed.", filename);
             close(fd);
             RETURN_FALSE;
         }
         if (_stat.st_size == 0)
         {
-            swoole_php_sys_error(E_WARNING, "file[%s] is empty.", filename);
+            php_swoole_sys_error(E_WARNING, "file[%s] is empty.", filename);
             close(fd);
             RETURN_FALSE;
         }
@@ -205,7 +205,7 @@ static PHP_METHOD(swoole_mmap, open)
     void *addr = mmap(NULL, size, PROT_WRITE | PROT_READ, MAP_SHARED, fd, offset);
     if (addr == MAP_FAILED)
     {
-        swoole_php_sys_error(E_WARNING, "mmap(" ZEND_LONG_FMT ") failed.", size);
+        php_swoole_sys_error(E_WARNING, "mmap(" ZEND_LONG_FMT ") failed.", size);
         close(fd);
         RETURN_FALSE;
     }
