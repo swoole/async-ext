@@ -156,7 +156,7 @@ static sw_inline void redis_execute_connect_callback(swRedisClient *redis, int s
     redis->connecting = 1;
     if (sw_call_user_function_ex(EG(function_table), NULL, zcallback, &retval, 2, args, 0, NULL) != SUCCESS)
     {
-        swoole_php_fatal_error(E_WARNING, "swoole_async_redis connect_callback handler error.");
+        php_swoole_fatal_error(E_WARNING, "swoole_async_redis connect_callback handler error.");
     }
     if (UNEXPECTED(EG(exception)))
     {
@@ -232,7 +232,7 @@ static PHP_METHOD(swoole_redis, __construct)
             zend_string *str = zval_get_string(ztmp);
             if (ZSTR_LEN(str) >= 1 << 8)
             {
-                swoole_php_fatal_error(E_WARNING, "redis password is too long.");
+                php_swoole_fatal_error(E_WARNING, "redis password is too long.");
             }
             else if (ZSTR_LEN(str) > 0)
             {
@@ -247,7 +247,7 @@ static PHP_METHOD(swoole_redis, __construct)
         {
             if (zval_get_long(ztmp) > 1 << 8)
             {
-                swoole_php_fatal_error(E_WARNING, "redis database number is too big.");
+                php_swoole_fatal_error(E_WARNING, "redis database number is too big.");
             }
             else
             {
@@ -274,7 +274,7 @@ static PHP_METHOD(swoole_redis, on)
     swRedisClient *redis = swoole_get_object(getThis());
     if (redis->context != NULL)
     {
-        swoole_php_fatal_error(E_WARNING, "Must be called before connecting.");
+        php_swoole_fatal_error(E_WARNING, "Must be called before connecting.");
         RETURN_FALSE;
     }
 
@@ -292,7 +292,7 @@ static PHP_METHOD(swoole_redis, on)
     }
     else
     {
-        swoole_php_error(E_WARNING, "Unknown event type[%s]", name);
+        php_swoole_error(E_WARNING, "Unknown event type[%s]", name);
         RETURN_FALSE;
     }
     RETURN_TRUE;
@@ -312,7 +312,7 @@ static PHP_METHOD(swoole_redis, connect)
 
     if (host_len == 0)
     {
-        swoole_php_fatal_error(E_WARNING, "redis server host is empty.");
+        php_swoole_fatal_error(E_WARNING, "redis server host is empty.");
         RETURN_FALSE;
     }
 
@@ -327,7 +327,7 @@ static PHP_METHOD(swoole_redis, connect)
     {
         if (port <= 1 || port > 65535)
         {
-            swoole_php_error(E_WARNING, "redis server port is invalid.");
+            php_swoole_error(E_WARNING, "redis server port is invalid.");
             RETURN_FALSE;
         }
         context = redisAsyncConnect(host, (int) port);
@@ -335,14 +335,14 @@ static PHP_METHOD(swoole_redis, connect)
 
     if (context == NULL)
     {
-        swoole_php_error(E_WARNING, "redisAsyncConnect() failed.");
+        php_swoole_error(E_WARNING, "redisAsyncConnect() failed.");
         RETURN_FALSE;
     }
 
     if (context->err)
     {
         redisAsyncFree(context);
-        swoole_php_error(E_WARNING, "failed to connect to the redis-server[%s:%d], Erorr: %s[%d]", host, (int) port, context->errstr, context->err);
+        php_swoole_error(E_WARNING, "failed to connect to the redis-server[%s:%d], Erorr: %s[%d]", host, (int) port, context->errstr, context->err);
         RETURN_FALSE;
     }
 
@@ -373,7 +373,7 @@ static PHP_METHOD(swoole_redis, connect)
 
     if (SwooleG.main_reactor->add(SwooleG.main_reactor, redis->context->c.fd, PHP_SWOOLE_FD_REDIS | SW_EVENT_WRITE) < 0)
     {
-        swoole_php_fatal_error(E_WARNING, "swoole_event_add failed. Erorr: %s[%d].", redis->context->errstr, redis->context->err);
+        php_swoole_fatal_error(E_WARNING, "swoole_event_add failed. Erorr: %s[%d].", redis->context->errstr, redis->context->err);
         RETURN_FALSE;
     }
 
@@ -472,39 +472,39 @@ static PHP_METHOD(swoole_redis, __call)
 
     if (Z_TYPE_P(params) != IS_ARRAY)
     {
-        swoole_php_fatal_error(E_WARNING, "invalid params.");
+        php_swoole_fatal_error(E_WARNING, "invalid params.");
         RETURN_FALSE;
     }
 
     swRedisClient *redis = swoole_get_object(getThis());
     if (!redis)
     {
-        swoole_php_fatal_error(E_WARNING, "the object is not an instance of swoole_redis.");
+        php_swoole_fatal_error(E_WARNING, "the object is not an instance of swoole_redis.");
         RETURN_FALSE;
     }
 
     switch (redis->state)
     {
     case SWOOLE_REDIS_STATE_CONNECT:
-        swoole_php_error(E_WARNING, "redis client is not connected.");
+        php_swoole_error(E_WARNING, "redis client is not connected.");
         RETURN_FALSE;
         break;
     case SWOOLE_REDIS_STATE_WAIT_RESULT:
         if (swoole_redis_is_message_command(command, command_len))
         {
-            swoole_php_error(E_WARNING, "redis client is waiting for response.");
+            php_swoole_error(E_WARNING, "redis client is waiting for response.");
             RETURN_FALSE;
         }
         break;
     case SWOOLE_REDIS_STATE_SUBSCRIBE:
         if (!swoole_redis_is_message_command(command, command_len))
         {
-            swoole_php_error(E_WARNING, "redis client is waiting for subscribed messages.");
+            php_swoole_error(E_WARNING, "redis client is waiting for subscribed messages.");
             RETURN_FALSE;
         }
         break;
     case SWOOLE_REDIS_STATE_CLOSED:
-        swoole_php_error(E_WARNING, "redis client connection is closed.");
+        php_swoole_error(E_WARNING, "redis client connection is closed.");
         RETURN_FALSE;
         break;
     default:
@@ -565,7 +565,7 @@ static PHP_METHOD(swoole_redis, __call)
 
         if (redisAsyncCommandArgv(redis->context, swoole_redis_onResult, NULL, argc + 1, (const char **) argv, (const size_t *) argvlen) < 0)
         {
-            swoole_php_error(E_WARNING, "redisAsyncCommandArgv() failed.");
+            php_swoole_error(E_WARNING, "redisAsyncCommandArgv() failed.");
             redis_free_memory(argc, argv, argvlen, redis, free_mm);
             RETURN_FALSE;
         }
@@ -581,7 +581,7 @@ static PHP_METHOD(swoole_redis, __call)
         zval *callback = zend_hash_index_find(Z_ARRVAL_P(params), zend_hash_num_elements(Z_ARRVAL_P(params)) - 1);
         if (callback == NULL)
         {
-            swoole_php_error(E_WARNING, "index out of array bounds.");
+            php_swoole_error(E_WARNING, "index out of array bounds.");
             redis_free_memory(argc, argv, argvlen, redis, free_mm);
             RETURN_FALSE;
         }
@@ -609,7 +609,7 @@ static PHP_METHOD(swoole_redis, __call)
 
         if (redisAsyncCommandArgv(redis->context, swoole_redis_onResult, callback, argc, (const char **) argv, (const size_t *) argvlen) < 0)
         {
-            swoole_php_error(E_WARNING, "redisAsyncCommandArgv() failed.");
+            php_swoole_error(E_WARNING, "redisAsyncCommandArgv() failed.");
             redis_free_memory(argc, argv, argvlen, redis, free_mm);
             RETURN_FALSE;
         }
@@ -624,7 +624,7 @@ static PHP_METHOD(swoole_redis, getState)
     swRedisClient *redis = swoole_get_object(getThis());
     if (!redis)
     {
-        swoole_php_fatal_error(E_WARNING, "object is not instanceof swoole_redis.");
+        php_swoole_fatal_error(E_WARNING, "object is not instanceof swoole_redis.");
         RETURN_FALSE;
     }
     RETURN_LONG(redis->state);
@@ -805,7 +805,7 @@ static void swoole_redis_onResult(redisAsyncContext *c, void *r, void *privdata)
 
     if (sw_call_user_function_ex(EG(function_table), NULL, callback, &retval, 2, args, 0, NULL) != SUCCESS)
     {
-        swoole_php_fatal_error(E_WARNING, "swoole_redis callback[%s] handler error.", callback_type);
+        php_swoole_fatal_error(E_WARNING, "swoole_redis callback[%s] handler error.", callback_type);
     }
     if (UNEXPECTED(EG(exception)))
     {
@@ -877,7 +877,7 @@ void swoole_redis_onClose(const redisAsyncContext *c, int status)
         args[0] = *redis->object;
         if (sw_call_user_function_ex(EG(function_table), NULL, zcallback, &retval, 1, args, 0, NULL) != SUCCESS)
         {
-            swoole_php_fatal_error(E_WARNING, "swoole_async_redis close_callback handler error.");
+            php_swoole_fatal_error(E_WARNING, "swoole_async_redis close_callback handler error.");
         }
         if (UNEXPECTED(EG(exception)))
         {
@@ -914,7 +914,7 @@ static int swoole_redis_onError(swReactor *reactor, swEvent *event)
         redis->connecting = 1;
         if (sw_call_user_function_ex(EG(function_table), NULL, zcallback, NULL, 2, args, 0, NULL) != SUCCESS)
         {
-            swoole_php_fatal_error(E_WARNING, "swoole_async_redis connect_callback handler error.");
+            php_swoole_fatal_error(E_WARNING, "swoole_async_redis connect_callback handler error.");
         }
         if (UNEXPECTED(EG(exception)))
         {

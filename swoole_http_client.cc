@@ -310,14 +310,14 @@ static int http_client_execute(zval *zobject, char *uri, size_t uri_len, zval *c
 {
     if (uri_len == 0)
     {
-        swoole_php_fatal_error(E_WARNING, "path is empty.");
+        php_swoole_fatal_error(E_WARNING, "path is empty.");
         return SW_ERR;
     }
 
     char *func_name = NULL;
     if (!sw_zend_is_callable(callback, 0, &func_name))
     {
-        swoole_php_fatal_error(E_WARNING, "function '%s' is not callable", func_name);
+        php_swoole_fatal_error(E_WARNING, "function '%s' is not callable", func_name);
         efree(func_name);
         return SW_ERR;
     }
@@ -337,12 +337,12 @@ static int http_client_execute(zval *zobject, char *uri, size_t uri_len, zval *c
         if (http->state != HTTP_CLIENT_STATE_READY)
         {
             //swWarn("fd=%d, state=%d, active=%d, keep_alive=%d", http->cli->socket->fd, http->state, http->cli->socket->active, http->keep_alive);
-            swoole_php_fatal_error(E_WARNING, "Operation now in progress phase %d.", http->state);
+            php_swoole_fatal_error(E_WARNING, "Operation now in progress phase %d.", http->state);
             return SW_ERR;
         }
         else if (!http->cli->socket->active)
         {
-            swoole_php_fatal_error(E_WARNING, "connection#%d is closed.", http->cli->socket->fd);
+            php_swoole_fatal_error(E_WARNING, "connection#%d is closed.", http->cli->socket->fd);
             return SW_ERR;
         }
     }
@@ -362,7 +362,7 @@ static int http_client_execute(zval *zobject, char *uri, size_t uri_len, zval *c
         http->body = swString_new(SW_HTTP_RESPONSE_INIT_SIZE);
         if (http->body == NULL)
         {
-            swoole_php_fatal_error(E_ERROR, "[1] swString_new(%d) failed.", SW_HTTP_RESPONSE_INIT_SIZE);
+            php_swoole_fatal_error(E_ERROR, "[1] swString_new(%d) failed.", SW_HTTP_RESPONSE_INIT_SIZE);
             return SW_ERR;
         }
     }
@@ -381,7 +381,7 @@ static int http_client_execute(zval *zobject, char *uri, size_t uri_len, zval *c
 
     if (callback == NULL || ZVAL_IS_NULL(callback))
     {
-        swoole_php_fatal_error(E_WARNING, "response callback is not set.");
+        php_swoole_fatal_error(E_WARNING, "response callback is not set.");
     }
 
     Z_TRY_ADDREF_P(callback);
@@ -469,14 +469,14 @@ static int http_client_execute(zval *zobject, char *uri, size_t uri_len, zval *c
             zval *zsend_header = sw_zend_read_property(swoole_http_client_ce, zobject, ZEND_STRL("requestHeaders"), 1);
             if (zsend_header == NULL || Z_TYPE_P(zsend_header) != IS_ARRAY)
             {
-                swoole_php_fatal_error (E_WARNING, "http proxy must set Host");
+                php_swoole_fatal_error (E_WARNING, "http proxy must set Host");
                 return SW_ERR;
             }
             zval *value;
             if (!(value = zend_hash_str_find(Z_ARRVAL_P(zsend_header), ZEND_STRL("Host"))) ||
                     Z_TYPE_P(value) != IS_STRING || Z_STRLEN_P(value) < 1)
             {
-                swoole_php_fatal_error(E_WARNING, "http proxy must set Host");
+                php_swoole_fatal_error(E_WARNING, "http proxy must set Host");
                 return SW_ERR;
             }
             if (http->cli->http_proxy->password)
@@ -496,7 +496,7 @@ static int http_client_execute(zval *zobject, char *uri, size_t uri_len, zval *c
 
     if (cli->socket->active == 1)
     {
-        swoole_php_fatal_error(E_WARNING, "swoole_http_client is already connected.");
+        php_swoole_fatal_error(E_WARNING, "swoole_http_client is already connected.");
         return SW_ERR;
     }
 
@@ -606,7 +606,7 @@ static void http_client_execute_callback(zval *zobject, enum php_swoole_client_c
     args[0] = *zobject;
     if (sw_call_user_function_ex(EG(function_table), NULL, callback, &retval, 1, args, 0, NULL) == FAILURE)
     {
-        swoole_php_fatal_error(E_WARNING, "swoole_http_client->%s handler error.", callback_name);
+        php_swoole_fatal_error(E_WARNING, "swoole_http_client->%s handler error.", callback_name);
     }
     if (UNEXPECTED(EG(exception)))
     {
@@ -655,7 +655,7 @@ static int http_client_onMessage(swProtocol *proto, swConnection *conn, char *da
     zval *zcallback = hcc->onMessage;
     if (sw_call_user_function_ex(EG(function_table), NULL, zcallback, &retval, 2, args, 0, NULL)  == FAILURE)
     {
-        swoole_php_fatal_error(E_ERROR, "swoole_http_client->onMessage: onClose handler error");
+        php_swoole_fatal_error(E_ERROR, "swoole_http_client->onMessage: onClose handler error");
     }
     if (UNEXPECTED(EG(exception)))
     {
@@ -734,7 +734,7 @@ static void http_client_onResponseException(zval *zobject)
     args[0] = *zobject;
     if (sw_call_user_function_ex(EG(function_table), NULL, zcallback, &retval, 1, args, 0, NULL) == FAILURE)
     {
-        swoole_php_fatal_error(E_WARNING, "onResponse handler error");
+        php_swoole_fatal_error(E_WARNING, "onResponse handler error");
     }
     if (UNEXPECTED(EG(exception)))
     {
@@ -752,7 +752,7 @@ static void http_client_onReceive(swClient *cli, char *data, uint32_t length)
     http_client *http = (http_client *) swoole_get_object(zobject);
     if (!http->cli)
     {
-        swoole_php_fatal_error(E_WARNING, "object is not instanceof swoole_http_client.");
+        php_swoole_fatal_error(E_WARNING, "object is not instanceof swoole_http_client.");
         return;
     }
 
@@ -807,7 +807,7 @@ static void http_client_onReceive(swClient *cli, char *data, uint32_t length)
     zval *zcallback = hcc->onResponse;
     if (zcallback == NULL || ZVAL_IS_NULL(zcallback))
     {
-        swoole_php_fatal_error(E_WARNING, "swoole_http_client object have not receive callback.");
+        php_swoole_fatal_error(E_WARNING, "swoole_http_client object have not receive callback.");
         return;
     }
 
@@ -842,7 +842,7 @@ static void http_client_onReceive(swClient *cli, char *data, uint32_t length)
     args[0] = *zobject;
     if (sw_call_user_function_ex(EG(function_table), NULL, zcallback, &retval, 1, args, 0, NULL) == FAILURE)
     {
-        swoole_php_fatal_error(E_WARNING, "onReactorCallback handler error");
+        php_swoole_fatal_error(E_WARNING, "onReactorCallback handler error");
     }
     if (UNEXPECTED(EG(exception)))
     {
@@ -876,7 +876,7 @@ static void http_client_onConnect(swClient *cli)
     http_client *http = (http_client *) swoole_get_object(zobject);
     if (!http->cli)
     {
-        swoole_php_fatal_error(E_WARNING, "object is not instanceof swoole_http_client.");
+        php_swoole_fatal_error(E_WARNING, "object is not instanceof swoole_http_client.");
         return;
     }
     http_client_execute_callback(zobject, SW_CLIENT_CB_onConnect);
@@ -890,19 +890,19 @@ static int http_client_send_http_request(zval *zobject)
     http_client *http = (http_client *) swoole_get_object(zobject);
     if (!http->cli)
     {
-        swoole_php_fatal_error(E_WARNING, "object is not instanceof swoole_http_client.");
+        php_swoole_fatal_error(E_WARNING, "object is not instanceof swoole_http_client.");
         return SW_ERR;
     }
 
     if (!http->cli->socket && http->cli->socket->active == 0)
     {
-        swoole_php_error(E_WARNING, "server is not connected.");
+        php_swoole_error(E_WARNING, "server is not connected.");
         return SW_ERR;
     }
 
     if (http->state != HTTP_CLIENT_STATE_READY)
     {
-        swoole_php_error(E_WARNING, "http client is not ready.");
+        php_swoole_error(E_WARNING, "http client is not ready.");
         return SW_ERR;
     }
 
@@ -1047,7 +1047,7 @@ static int http_client_send_http_request(zval *zobject)
             swString_append_ptr(http_client_buffer, "=", 1);
 
             int encoded_value_len;
-            encoded_value = sw_php_url_encode(ZSTR_VAL(str), ZSTR_LEN(str), &encoded_value_len);
+            encoded_value = php_swoole_url_encode(ZSTR_VAL(str), ZSTR_LEN(str), &encoded_value_len);
             if (encoded_value)
             {
                 swString_append_ptr(http_client_buffer, encoded_value, encoded_value_len);
@@ -1225,10 +1225,10 @@ static int http_client_send_http_request(zval *zobject)
             if (php_swoole_array_length(zpost_data) > 0) //if it's an empty array, http build will fail
             {
                 smart_str formstr_s = { 0 };
-                char *formstr = sw_http_build_query(zpost_data, &len, &formstr_s);
+                char *formstr = php_swoole_http_build_query(zpost_data, &len, &formstr_s);
                 if (formstr == NULL)
                 {
-                    swoole_php_error(E_WARNING, "http_build_query failed.");
+                    php_swoole_error(E_WARNING, "http_build_query failed.");
                     return SW_ERR;
                 }
                 http_client_append_content_length(http_client_buffer, len);
@@ -1286,7 +1286,7 @@ static int http_client_send_http_request(zval *zobject)
         {
             send_fail:
             SwooleG.error = errno;
-            swoole_php_sys_error(E_WARNING, "send(%d) %d bytes failed.", http->cli->socket->fd, (int )http_client_buffer->length);
+            php_swoole_sys_error(E_WARNING, "send(%d) %d bytes failed.", http->cli->socket->fd, (int )http_client_buffer->length);
             zend_update_property_long(swoole_http_client_ce, zobject, ZEND_STRL("errCode"), SwooleG.error);
             return SW_ERR;
         }
@@ -1447,13 +1447,13 @@ static PHP_METHOD(swoole_http_client, __construct)
 
     if (host_len == 0)
     {
-        swoole_php_fatal_error(E_WARNING, "host is empty.");
+        php_swoole_fatal_error(E_WARNING, "host is empty.");
         RETURN_FALSE;
     }
 
     if (port <= 0 || port > SW_CLIENT_MAX_PORT)
     {
-        swoole_php_fatal_error(E_WARNING, "invalid port.");
+        php_swoole_fatal_error(E_WARNING, "invalid port.");
         RETURN_FALSE;
     }
 
@@ -1476,7 +1476,7 @@ static PHP_METHOD(swoole_http_client, __construct)
 #ifdef SW_USE_OPENSSL
         flags |= SW_SOCK_SSL;
 #else
-        swoole_php_fatal_error(E_ERROR, "Need to use `--enable-openssl` to support ssl when compiling swoole.");
+        php_swoole_fatal_error(E_ERROR, "Need to use `--enable-openssl` to support ssl when compiling swoole.");
 #endif
     }
 
@@ -1606,22 +1606,22 @@ static PHP_METHOD(swoole_http_client, addFile)
     struct stat file_stat;
     if (stat(path, &file_stat) < 0)
     {
-        swoole_php_sys_error(E_WARNING, "stat(%s) failed.", path);
+        php_swoole_sys_error(E_WARNING, "stat(%s) failed.", path);
         RETURN_FALSE;
     }
     if (file_stat.st_size == 0)
     {
-        swoole_php_sys_error(E_WARNING, "cannot send empty file[%s].", filename);
+        php_swoole_sys_error(E_WARNING, "cannot send empty file[%s].", filename);
         RETURN_FALSE;
     }
     if (file_stat.st_size <= offset)
     {
-        swoole_php_error(E_WARNING, "parameter $offset[" ZEND_LONG_FMT "] exceeds the file size.", offset);
+        php_swoole_error(E_WARNING, "parameter $offset[" ZEND_LONG_FMT "] exceeds the file size.", offset);
         RETURN_FALSE;
     }
     if (length > file_stat.st_size - offset)
     {
-        swoole_php_sys_error(E_WARNING, "parameter $length[" ZEND_LONG_FMT "] exceeds the file size.", length);
+        php_swoole_sys_error(E_WARNING, "parameter $length[" ZEND_LONG_FMT "] exceeds the file size.", length);
         RETURN_FALSE;
     }
     if (length == 0)
@@ -1686,7 +1686,7 @@ static PHP_METHOD(swoole_http_client, setMethod)
     int http_method = swHttp_get_method(method, length + 1);
     if (length == 0 || http_method < 0)
     {
-        swoole_php_error(E_WARNING, "invalid http method.");
+        php_swoole_error(E_WARNING, "invalid http method.");
         RETURN_FALSE;
     }
 
@@ -1727,17 +1727,17 @@ static PHP_METHOD(swoole_http_client, close)
     swClient *cli = http->cli;
     if (!cli)
     {
-        swoole_php_fatal_error(E_WARNING, "object is not instanceof swoole_http_client.");
+        php_swoole_fatal_error(E_WARNING, "object is not instanceof swoole_http_client.");
         RETURN_FALSE;
     }
     if (!cli->socket)
     {
-        swoole_php_error(E_WARNING, "not connected to the server");
+        php_swoole_error(E_WARNING, "not connected to the server");
         RETURN_FALSE;
     }
     if (cli->socket->closed)
     {
-        swoole_php_error(E_WARNING, "client socket is closed.");
+        php_swoole_error(E_WARNING, "client socket is closed.");
         RETURN_FALSE;
     }
     int ret = SW_OK;
@@ -1768,7 +1768,7 @@ static PHP_METHOD(swoole_http_client, on)
     char *func_name = NULL;
     if (!sw_zend_is_callable(zcallback, 0, &func_name))
     {
-        swoole_php_fatal_error(E_ERROR, "function '%s' is not callable", func_name);
+        php_swoole_fatal_error(E_ERROR, "function '%s' is not callable", func_name);
         return;
     }
     efree(func_name);
@@ -1801,7 +1801,7 @@ static PHP_METHOD(swoole_http_client, on)
     }
     else
     {
-        swoole_php_fatal_error(E_WARNING, "swoole_http_client: event callback[%s] is unknow", cb_name);
+        php_swoole_fatal_error(E_WARNING, "swoole_http_client: event callback[%s] is unknow", cb_name);
         RETURN_FALSE;
     }
     RETURN_TRUE;
@@ -2009,7 +2009,7 @@ static PHP_METHOD(swoole_http_client, execute)
     http_client_property *hcc = (http_client_property *) swoole_get_property(getThis(), 0);
     if (hcc->shutdown)
     {
-        swoole_php_error(E_WARNING, "Connection failed, the server was unavailable.");
+        php_swoole_error(E_WARNING, "Connection failed, the server was unavailable.");
         return;
     }
     ret = http_client_execute(getThis(), uri, uri_len, finish_cb);
@@ -2030,7 +2030,7 @@ static PHP_METHOD(swoole_http_client, get)
     http_client_property *hcc = (http_client_property *) swoole_get_property(getThis(), 0);
     if (hcc->shutdown)
     {
-        swoole_php_error(E_WARNING, "Connection failed, the server was unavailable.");
+        php_swoole_error(E_WARNING, "Connection failed, the server was unavailable.");
         return;
     }
     ret = http_client_execute(getThis(), uri, uri_len, finish_cb);
@@ -2054,7 +2054,7 @@ static PHP_METHOD(swoole_http_client, download)
     http_client_property *hcc = (http_client_property *) swoole_get_property(getThis(), 0);
     if (hcc->shutdown)
     {
-        swoole_php_error(E_WARNING, "Connection failed, the server was unavailable.");
+        php_swoole_error(E_WARNING, "Connection failed, the server was unavailable.");
         return;
     }
     zend_update_property(swoole_http_client_ce, getThis(), ZEND_STRL("downloadFile"), download_file);
@@ -2085,7 +2085,7 @@ static PHP_METHOD(swoole_http_client, post)
     http_client_property *hcc = (http_client_property *) swoole_get_property(getThis(), 0);
     if (hcc->shutdown)
     {
-        swoole_php_error(E_WARNING, "Connection failed, the server was unavailable.");
+        php_swoole_error(E_WARNING, "Connection failed, the server was unavailable.");
         return;
     }
     if (Z_TYPE_P(data) == IS_ARRAY)
@@ -2116,12 +2116,12 @@ static PHP_METHOD(swoole_http_client, upgrade)
     http_client_property *hcc = (http_client_property *) swoole_get_property(getThis(), 0);
     if (hcc->shutdown)
     {
-        swoole_php_error(E_WARNING, "Connection failed, the server was unavailable.");
+        php_swoole_error(E_WARNING, "Connection failed, the server was unavailable.");
         return;
     }
     if (!hcc->onMessage)
     {
-        swoole_php_fatal_error(E_WARNING, "cannot use the upgrade method, must first register the onMessage event callback.");
+        php_swoole_fatal_error(E_WARNING, "cannot use the upgrade method, must first register the onMessage event callback.");
         return;
     }
 
@@ -2154,7 +2154,7 @@ static PHP_METHOD(swoole_http_client, push)
 
     if (unlikely(opcode > SW_WEBSOCKET_OPCODE_MAX))
     {
-        swoole_php_fatal_error(E_WARNING, "the maximum value of opcode is %d.", SW_WEBSOCKET_OPCODE_MAX);
+        php_swoole_fatal_error(E_WARNING, "the maximum value of opcode is %d.", SW_WEBSOCKET_OPCODE_MAX);
         SwooleG.error = SW_ERROR_WEBSOCKET_BAD_OPCODE;
         RETURN_FALSE;
     }
@@ -2165,13 +2165,13 @@ static PHP_METHOD(swoole_http_client, push)
         http_client_property *hcc = (http_client_property *) swoole_get_property(getThis(), 0);
         if (hcc->error_flag & HTTP_CLIENT_EFLAG_UPGRADE)
         {
-            swoole_php_fatal_error(E_WARNING, "websocket handshake failed, cannot push data.");
+            php_swoole_fatal_error(E_WARNING, "websocket handshake failed, cannot push data.");
             SwooleG.error = SW_ERROR_WEBSOCKET_HANDSHAKE_FAILED;
             RETURN_FALSE;
         }
         else
         {
-            swoole_php_error(E_WARNING, "not connected to the server");
+            php_swoole_error(E_WARNING, "not connected to the server");
             SwooleG.error = SW_ERROR_WEBSOCKET_UNCONNECTED;
             RETURN_FALSE;
         }
