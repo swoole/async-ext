@@ -185,7 +185,7 @@ void swoole_async_init(int module_number)
 {
     SW_INIT_CLASS_ENTRY(swoole_async, "Swoole\\Async", "swoole_async", NULL, swoole_async_methods);
     SW_SET_CLASS_SERIALIZABLE(swoole_async, zend_class_serialize_deny, zend_class_unserialize_deny);
-    SW_SET_CLASS_CLONEABLE(swoole_async, zend_class_clone_deny);
+    SW_SET_CLASS_CLONEABLE(swoole_async, sw_zend_class_clone_deny);
     SW_SET_CLASS_UNSET_PROPERTY_HANDLER(swoole_async, sw_zend_class_unset_property_deny);
 }
 
