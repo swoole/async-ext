@@ -2,7 +2,7 @@
 
 Coroutine style API became the mainstream in the Swoole `core` since version 4.3.0.
 
-`ext-async` depends on swoole, it is a extension of swoole, including the async callback style API.
+`ext-async` depends on swoole, it is an extension of Swoole, including the async callback style API.
 
 You have to install Swoole extension before installing this extenion.
 
