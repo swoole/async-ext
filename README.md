@@ -11,10 +11,10 @@ You have to install Swoole extension before installing this extenion.
 Async clients and API are moved to a separate PHP extension `swoole_async` since version 4.3.0, install `swoole_async`:
 
 ```shell
-git clone https://github.com/swoole/async-ext.git
-cd async-src
+git clone https://github.com/swoole/ext-async.git
+cd ext-async
 phpize
-./confiugre
+./configure
 make -j 4
 sudo make install
 ```
