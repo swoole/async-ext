@@ -181,12 +181,12 @@ static PHP_METHOD(swoole_memory_pool, __construct)
     mp->slice_count = 0;
     mp->released = 0;
 
-    swoole_set_object(getThis(), mp);
+    swoole_set_object(ZEND_THIS, mp);
 }
 
 static PHP_METHOD(swoole_memory_pool, alloc)
 {
-    MemoryPool* mp = (MemoryPool*) swoole_get_object(getThis());
+    MemoryPool* mp = (MemoryPool*) swoole_get_object(ZEND_THIS);
     zend_long size = mp->slice_size;
 
     ZEND_PARSE_PARAMETERS_START(0, 1)
@@ -233,13 +233,13 @@ static PHP_METHOD(swoole_memory_pool, __destruct)
 {
     SW_PREVENT_USER_DESTRUCT();
 
-    MemoryPool* mp = (MemoryPool*) swoole_get_object(getThis());
+    MemoryPool* mp = (MemoryPool*) swoole_get_object(ZEND_THIS);
     if (mp == NULL)
     {
         return;
     }
 
-    swoole_set_object(getThis(), NULL);
+    swoole_set_object(ZEND_THIS, NULL);
 
     if (mp->type == memory_pool_type_malloc || mp->type == memory_pool_type_malloc)
     {
@@ -269,7 +269,7 @@ static PHP_METHOD(swoole_memory_pool_slice, read)
         Z_PARAM_LONG(offset)
     ZEND_PARSE_PARAMETERS_END_EX(RETURN_FALSE);
 
-    MemorySlice *info = (MemorySlice *) swoole_get_object(getThis());
+    MemorySlice *info = (MemorySlice *) swoole_get_object(ZEND_THIS);
     if (size <= 0)
     {
         size = info->size;
@@ -301,7 +301,7 @@ static PHP_METHOD(swoole_memory_pool_slice, write)
         Z_PARAM_LONG(offset)
     ZEND_PARSE_PARAMETERS_END_EX(RETURN_FALSE);
 
-    MemorySlice *info = (MemorySlice *) swoole_get_object(getThis());
+    MemorySlice *info = (MemorySlice *) swoole_get_object(ZEND_THIS);
     size = ZSTR_LEN(data);
     if (size > info->size)
     {
@@ -323,7 +323,7 @@ static PHP_METHOD(swoole_memory_pool_slice, __destruct)
 {
     SW_PREVENT_USER_DESTRUCT();
 
-    MemorySlice *info = (MemorySlice *) swoole_get_object(getThis());
+    MemorySlice *info = (MemorySlice *) swoole_get_object(ZEND_THIS);
     if (info == NULL)
     {
         return;
@@ -353,6 +353,6 @@ static PHP_METHOD(swoole_memory_pool_slice, __destruct)
         }
     }
 
-    swoole_set_object(getThis(), NULL);
+    swoole_set_object(ZEND_THIS, NULL);
     efree(info);
 }

@@ -712,14 +712,14 @@ int mysql_parse_rsa(mysql_connector *connector, char *buf, int len)
     // prepare RSA public key
     BIO *bio = NULL;
     RSA *public_rsa = NULL;
-    if (unlikely((bio = BIO_new_mem_buf((void *)rsa_public_key, -1)) == NULL))
+    if (sw_unlikely((bio = BIO_new_mem_buf((void *)rsa_public_key, -1)) == NULL))
     {
         swWarn("BIO_new_mem_buf publicKey error!");
         return SW_ERR;
     }
     // PEM_read_bio_RSA_PUBKEY
     ERR_clear_error();
-    if (unlikely((public_rsa = PEM_read_bio_RSA_PUBKEY(bio, NULL, NULL, NULL)) == NULL))
+    if (sw_unlikely((public_rsa = PEM_read_bio_RSA_PUBKEY(bio, NULL, NULL, NULL)) == NULL))
     {
         ERR_load_crypto_strings();
         char err_buf[512];
@@ -737,7 +737,7 @@ int mysql_parse_rsa(mysql_connector *connector, char *buf, int len)
     int flen = rsa_len - 42;
     flen = password_len > flen ? flen : password_len;
     swTraceLog(SW_TRACE_MYSQL_CLIENT, "rsa_len=%d", rsa_len);
-    if (unlikely(RSA_public_encrypt(flen, (const unsigned char *)password, (unsigned char *)encrypt_msg, public_rsa, RSA_PKCS1_OAEP_PADDING) < 0))
+    if (sw_unlikely(RSA_public_encrypt(flen, (const unsigned char *)password, (unsigned char *)encrypt_msg, public_rsa, RSA_PKCS1_OAEP_PADDING) < 0))
     {
         ERR_load_crypto_strings();
         char err_buf[512];
@@ -878,7 +878,7 @@ static ssize_t mysql_decode_row(mysql_client *client, char *buf, uint32_t packet
         read_n += tmp_len;
 
         // WARNING: data may be longer than single packet (0x00fffff => 16M)
-        if (unlikely(len > packet_length - read_n))
+        if (sw_unlikely(len > packet_length - read_n))
         {
             mysql_big_data_info mbdi = { len, n_buf - read_n, packet_length - read_n, buf + read_n, 0, 0 };
             if ((zstring = mysql_decode_big_data(&mbdi)))
@@ -928,7 +928,7 @@ static ssize_t mysql_decode_row(mysql_client *client, char *buf, uint32_t packet
         case SW_MYSQL_TYPE_DATETIME:
         case SW_MYSQL_TYPE_DATE:
         case SW_MYSQL_TYPE_JSON:
-            if (unlikely(zstring))
+            if (sw_unlikely(zstring))
             {
                 zval _zdata, *zdata = &_zdata;
                 ZVAL_STR(zdata, zstring);
@@ -986,7 +986,7 @@ static ssize_t mysql_decode_row(mysql_client *client, char *buf, uint32_t packet
                         read_n = -SW_MYSQL_ERR_CONVLONGLONG;
                         goto _error;
                     }
-                    if (unlikely(row.ubigint > ZEND_LONG_MAX))
+                    if (sw_unlikely(row.ubigint > ZEND_LONG_MAX))
                     {
                         goto _longlongstring;
                     }
@@ -1221,7 +1221,7 @@ static ssize_t mysql_decode_row_prepare(mysql_client *client, char *buf, uint32_
             }
             read_n += tmp_len;
             // WARNING: data may be longer than single packet (0x00fffff => 16M)
-            if (unlikely(len > packet_length - read_n))
+            if (sw_unlikely(len > packet_length - read_n))
             {
                 zend_string *zstring;
                 mysql_big_data_info mbdi = { len, n_buf - read_n, packet_length - read_n, buf + read_n, 0, 0 };
@@ -1592,7 +1592,7 @@ static sw_inline int mysql_read_rows(mysql_client *client)
             );
         }
 
-        if (unlikely(read_n < 0))
+        if (sw_unlikely(read_n < 0))
         {
             // TODO: handle all decode error here
             if (read_n == SW_AGAIN)
@@ -1901,7 +1901,7 @@ int mysql_is_over(mysql_client *client)
     {
         swTraceLog(SW_TRACE_MYSQL_CLIENT, "check packet from %jd, remaining=%jd", (intmax_t) client->check_offset, (intmax_t) remaining_size);
         p = buffer->str + client->check_offset; // where to start checking now
-        if (unlikely(buffer->length < client->check_offset + SW_MYSQL_PACKET_HEADER_SIZE))
+        if (sw_unlikely(buffer->length < client->check_offset + SW_MYSQL_PACKET_HEADER_SIZE))
         {
             client->want_length = client->check_offset + SW_MYSQL_PACKET_HEADER_SIZE;
             break; // header incomplete
@@ -2228,7 +2228,7 @@ static PHP_METHOD(swoole_mysql, __construct)
     mysql_client *client = emalloc(sizeof(mysql_client));
 
     bzero(client, sizeof(mysql_client));
-    swoole_set_object(getThis(), client);
+    swoole_set_object(ZEND_THIS, client);
 }
 
 static PHP_METHOD(swoole_mysql, connect)
@@ -2242,7 +2242,7 @@ static PHP_METHOD(swoole_mysql, connect)
         RETURN_FALSE;
     }
 
-    mysql_client *client = swoole_get_object(getThis());
+    mysql_client *client = swoole_get_object(ZEND_THIS);
     if (client->cli)
     {
         php_swoole_error(E_WARNING, "The mysql client is already connected server.");
@@ -2411,13 +2411,13 @@ static PHP_METHOD(swoole_mysql, connect)
         goto _return;
     }
 
-    zend_update_property(swoole_mysql_ce, getThis(), ZEND_STRL("onConnect"), callback);
-    zend_update_property(swoole_mysql_ce, getThis(), ZEND_STRL("serverInfo"), server_info);
-    zend_update_property_long(swoole_mysql_ce, getThis(), ZEND_STRL("sock"), cli->socket->fd);
+    zend_update_property(swoole_mysql_ce, ZEND_THIS, ZEND_STRL("onConnect"), callback);
+    zend_update_property(swoole_mysql_ce, ZEND_THIS, ZEND_STRL("serverInfo"), server_info);
+    zend_update_property_long(swoole_mysql_ce, ZEND_THIS, ZEND_STRL("sock"), cli->socket->fd);
 
     client->buffer = swString_new(SW_BUFFER_SIZE_BIG);
     client->fd = cli->socket->fd;
-    client->object = getThis();
+    client->object = ZEND_THIS;
     client->cli = cli;
 
     connector->host = estrndup(connector->host, connector->host_len);
@@ -2478,14 +2478,14 @@ static PHP_METHOD(swoole_mysql, query)
         RETURN_FALSE;
     }
 
-    mysql_client *client = swoole_get_object(getThis());
+    mysql_client *client = swoole_get_object(ZEND_THIS);
     if (!client)
     {
         php_swoole_fatal_error(E_WARNING, "object is not instanceof swoole_mysql.");
         RETURN_FALSE;
     }
 
-    SW_CHECK_RETURN(mysql_query(getThis(), client, &sql, callback));
+    SW_CHECK_RETURN(mysql_query(ZEND_THIS, client, &sql, callback));
 }
 
 static PHP_METHOD(swoole_mysql, begin)
@@ -2501,7 +2501,7 @@ static PHP_METHOD(swoole_mysql, begin)
         RETURN_FALSE;
     }
 
-    mysql_client *client = swoole_get_object(getThis());
+    mysql_client *client = swoole_get_object(ZEND_THIS);
     if (!client)
     {
         php_swoole_fatal_error(E_WARNING, "object is not instanceof swoole_mysql.");
@@ -2516,7 +2516,7 @@ static PHP_METHOD(swoole_mysql, begin)
     swString sql;
     bzero(&sql, sizeof(sql));
     swString_append_ptr(&sql, ZEND_STRL("START TRANSACTION"));
-    if (mysql_query(getThis(), client, &sql, callback) < 0)
+    if (mysql_query(ZEND_THIS, client, &sql, callback) < 0)
     {
         RETURN_FALSE;
     }
@@ -2540,7 +2540,7 @@ static PHP_METHOD(swoole_mysql, commit)
         RETURN_FALSE;
     }
 
-    mysql_client *client = swoole_get_object(getThis());
+    mysql_client *client = swoole_get_object(ZEND_THIS);
     if (!client)
     {
         php_swoole_fatal_error(E_WARNING, "object is not instanceof swoole_mysql.");
@@ -2555,7 +2555,7 @@ static PHP_METHOD(swoole_mysql, commit)
     swString sql;
     bzero(&sql, sizeof(sql));
     swString_append_ptr(&sql, ZEND_STRL("COMMIT"));
-    if (mysql_query(getThis(), client, &sql, callback) < 0)
+    if (mysql_query(ZEND_THIS, client, &sql, callback) < 0)
     {
         RETURN_FALSE;
     }
@@ -2580,7 +2580,7 @@ static PHP_METHOD(swoole_mysql, rollback)
     }
 
 
-    mysql_client *client = swoole_get_object(getThis());
+    mysql_client *client = swoole_get_object(ZEND_THIS);
     if (!client)
     {
         php_swoole_fatal_error(E_WARNING, "object is not instanceof swoole_mysql.");
@@ -2595,7 +2595,7 @@ static PHP_METHOD(swoole_mysql, rollback)
     swString sql;
     bzero(&sql, sizeof(sql));
     swString_append_ptr(&sql, ZEND_STRL("ROLLBACK"));
-    if (mysql_query(getThis(), client, &sql, callback) < 0)
+    if (mysql_query(ZEND_THIS, client, &sql, callback) < 0)
     {
         RETURN_FALSE;
     }
@@ -2610,14 +2610,14 @@ static PHP_METHOD(swoole_mysql, __destruct)
 {
     SW_PREVENT_USER_DESTRUCT();
 
-    mysql_client *client = swoole_get_object(getThis());
+    mysql_client *client = swoole_get_object(ZEND_THIS);
     if (!client)
     {
         return;
     }
     if (client->state != SW_MYSQL_STATE_CLOSED && client->cli)
     {
-        zval *zobject = getThis();
+        zval *zobject = ZEND_THIS;
         client->cli->destroyed = 1;
         sw_zend_call_method_with_0_params(zobject, swoole_mysql_ce, NULL, "close", NULL);
     }
@@ -2627,12 +2627,12 @@ static PHP_METHOD(swoole_mysql, __destruct)
         swString_free(client->buffer);
     }
     efree(client);
-    swoole_set_object(getThis(), NULL);
+    swoole_set_object(ZEND_THIS, NULL);
 }
 
 static PHP_METHOD(swoole_mysql, close)
 {
-    mysql_client *client = swoole_get_object(getThis());
+    mysql_client *client = swoole_get_object(ZEND_THIS);
     if (!client)
     {
         php_swoole_fatal_error(E_WARNING, "object is not instanceof swoole_mysql.");
@@ -2650,7 +2650,7 @@ static PHP_METHOD(swoole_mysql, close)
         RETURN_FALSE;
     }
 
-    zend_update_property_bool(swoole_mysql_ce, getThis(), ZEND_STRL("connected"), 0);
+    zend_update_property_bool(swoole_mysql_ce, ZEND_THIS, ZEND_STRL("connected"), 0);
     SwooleG.main_reactor->del(SwooleG.main_reactor, client->fd);
 
     swConnection *socket = swReactor_get(SwooleG.main_reactor, client->fd);
@@ -2661,7 +2661,7 @@ static PHP_METHOD(swoole_mysql, close)
 
     zval *retval = NULL;
     zval args[1];
-    zval *object = getThis();
+    zval *object = ZEND_THIS;
     if (client->onClose)
     {
         client->cli->socket->closing = 1;
@@ -2679,7 +2679,7 @@ static PHP_METHOD(swoole_mysql, close)
             zval_ptr_dtor(retval);
         }
     }
-    mysql_client_free(client, getThis());
+    mysql_client_free(client, ZEND_THIS);
     if (!is_destroyed)
     {
         zval_ptr_dtor(object);
@@ -2697,7 +2697,7 @@ static PHP_METHOD(swoole_mysql, on)
         RETURN_FALSE;
     }
 
-    mysql_client *client = swoole_get_object(getThis());
+    mysql_client *client = swoole_get_object(ZEND_THIS);
     if (!client)
     {
         php_swoole_fatal_error(E_WARNING, "object is not instanceof swoole_mysql.");
@@ -2706,8 +2706,8 @@ static PHP_METHOD(swoole_mysql, on)
 
     if (strncasecmp("close", name, len) == 0)
     {
-        zend_update_property(swoole_mysql_ce, getThis(), ZEND_STRL("onClose"), cb);
-        client->onClose = sw_zend_read_property(swoole_mysql_ce, getThis(), ZEND_STRL("onClose"), 0);
+        zend_update_property(swoole_mysql_ce, ZEND_THIS, ZEND_STRL("onClose"), cb);
+        client->onClose = sw_zend_read_property(swoole_mysql_ce, ZEND_THIS, ZEND_STRL("onClose"), 0);
         sw_copy_to_stack(client->onClose, client->_onClose);
     }
     else
@@ -2720,7 +2720,7 @@ static PHP_METHOD(swoole_mysql, on)
 
 static PHP_METHOD(swoole_mysql, getState)
 {
-    mysql_client *client = swoole_get_object(getThis());
+    mysql_client *client = swoole_get_object(ZEND_THIS);
     if (!client)
     {
         php_swoole_fatal_error(E_WARNING, "object is not instanceof swoole_mysql.");
@@ -3150,7 +3150,7 @@ static PHP_METHOD(swoole_mysql, escape)
         RETURN_FALSE;
     }
 
-    mysql_client *client = swoole_get_object(getThis());
+    mysql_client *client = swoole_get_object(ZEND_THIS);
     if (!client)
     {
         php_swoole_fatal_error(E_WARNING, "object is not instanceof swoole_mysql.");

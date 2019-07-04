@@ -86,21 +86,21 @@ static PHP_METHOD(swoole_ringqueue, __construct)
         zend_throw_exception(swoole_exception_ce, "failed to init ringqueue.", SW_ERROR_MALLOC_FAIL);
         RETURN_FALSE;
     }
-    swoole_set_object(getThis(), queue);
+    swoole_set_object(ZEND_THIS, queue);
 }
 
 static PHP_METHOD(swoole_ringqueue, __destruct)
 {
     SW_PREVENT_USER_DESTRUCT();
 
-    swRingQueue *queue = swoole_get_object(getThis());
+    swRingQueue *queue = swoole_get_object(ZEND_THIS);
     efree(queue);
-    swoole_set_object(getThis(), NULL);
+    swoole_set_object(ZEND_THIS, NULL);
 }
 
 static PHP_METHOD(swoole_ringqueue, push)
 {
-    swRingQueue *queue = swoole_get_object(getThis());
+    swRingQueue *queue = swoole_get_object(ZEND_THIS);
     zval *zdata;
 
     if (zend_parse_parameters(ZEND_NUM_ARGS(), "z", &zdata) == FAILURE)
@@ -123,7 +123,7 @@ static PHP_METHOD(swoole_ringqueue, push)
 
 static PHP_METHOD(swoole_ringqueue, pop)
 {
-    swRingQueue *queue = swoole_get_object(getThis());
+    swRingQueue *queue = swoole_get_object(ZEND_THIS);
     zval *zdata;
 
     int n = swRingQueue_pop(queue, (void**)&zdata);
@@ -137,18 +137,18 @@ static PHP_METHOD(swoole_ringqueue, pop)
 
 static PHP_METHOD(swoole_ringqueue, isFull)
 {
-    swRingQueue *queue = swoole_get_object(getThis());
+    swRingQueue *queue = swoole_get_object(ZEND_THIS);
     RETURN_BOOL(swRingQueue_full(queue));
 }
 
 static PHP_METHOD(swoole_ringqueue, isEmpty)
 {
-    swRingQueue *queue = swoole_get_object(getThis());
+    swRingQueue *queue = swoole_get_object(ZEND_THIS);
     RETURN_BOOL(swRingQueue_empty(queue));
 }
 
 static PHP_METHOD(swoole_ringqueue, count)
 {
-    swRingQueue *queue = swoole_get_object(getThis());
+    swRingQueue *queue = swoole_get_object(ZEND_THIS);
     RETURN_LONG(swRingQueue_count(queue));
 }

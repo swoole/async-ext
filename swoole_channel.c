@@ -79,19 +79,19 @@ static PHP_METHOD(swoole_channel, __construct)
         zend_throw_exception(swoole_exception_ce, "failed to create channel.", SW_ERROR_MALLOC_FAIL);
         RETURN_FALSE;
     }
-    swoole_set_object(getThis(), chan);
+    swoole_set_object(ZEND_THIS, chan);
 }
 
 static PHP_METHOD(swoole_channel, __destruct)
 {
     SW_PREVENT_USER_DESTRUCT();
 
-    swoole_set_object(getThis(), NULL);
+    swoole_set_object(ZEND_THIS, NULL);
 }
 
 static PHP_METHOD(swoole_channel, push)
 {
-    swChannel *chan = swoole_get_object(getThis());
+    swChannel *chan = swoole_get_object(ZEND_THIS);
     zval *zdata;
 
     if (zend_parse_parameters(ZEND_NUM_ARGS(), "z", &zdata) == FAILURE)
@@ -109,7 +109,7 @@ static PHP_METHOD(swoole_channel, push)
 
 static PHP_METHOD(swoole_channel, pop)
 {
-    swChannel *chan = swoole_get_object(getThis());
+    swChannel *chan = swoole_get_object(ZEND_THIS);
     swEventData buf;
 
     int n = swChannel_pop(chan, &buf, sizeof(buf));
@@ -130,7 +130,7 @@ static PHP_METHOD(swoole_channel, pop)
 
 static PHP_METHOD(swoole_channel, peek)
 {
-    swChannel *chan = swoole_get_object(getThis());
+    swChannel *chan = swoole_get_object(ZEND_THIS);
     swEventData buf;
 
     int n = swChannel_peek(chan, &buf, sizeof(buf));
@@ -152,7 +152,7 @@ static PHP_METHOD(swoole_channel, peek)
 
 static PHP_METHOD(swoole_channel, stats)
 {
-    swChannel *chan = swoole_get_object(getThis());
+    swChannel *chan = swoole_get_object(ZEND_THIS);
     array_init(return_value);
 
     add_assoc_long_ex(return_value, ZEND_STRL("queue_num"), chan->num);
