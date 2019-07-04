@@ -1051,7 +1051,7 @@ static int process_stream_onRead(swReactor *reactor, swEvent *event)
     swString_free(ps->buffer);
 
     int status;
-    pid_t pid = swWaitpid(ps->pid, &status, WNOHANG);
+    pid_t pid = swoole_waitpid(ps->pid, &status, WNOHANG);
     if (pid > 0)
     {
         array_init(&args[1]);

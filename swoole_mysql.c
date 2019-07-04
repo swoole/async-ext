@@ -563,7 +563,7 @@ int mysql_auth_switch(mysql_connector *connector, char *buf, int len)
     if ((uint8_t) tmp[4] != SW_MYSQL_PACKET_EOF)
     {
         // out of the order packet
-        return SW_ERR;
+        return SW_ERROR;
     }
 
     int next_state = SW_MYSQL_HANDSHAKE_WAIT_RESULT;
@@ -572,7 +572,7 @@ int mysql_auth_switch(mysql_connector *connector, char *buf, int len)
     //continue to wait for data
     if (len < SW_MYSQL_PACKET_HEADER_SIZE + packet_length)
     {
-        return SW_AGAIN;
+        return SW_CONTINUE;
     }
     int packet_number = tmp[3];
     tmp += SW_MYSQL_PACKET_HEADER_SIZE;
@@ -630,7 +630,7 @@ int mysql_parse_auth_signature(swString *buffer, mysql_connector *connector)
     //continue to wait for data
     if (buffer->length < SW_MYSQL_PACKET_HEADER_SIZE + packet_length)
     {
-        return SW_AGAIN;
+        return SW_CONTINUE;
     }
 
     swMysqlPacketDump(tmp, SW_MYSQL_PACKET_HEADER_SIZE + packet_length, "Auth");
@@ -680,7 +680,7 @@ int mysql_parse_rsa(mysql_connector *connector, char *buf, int len)
     //continue to wait for data
     if (len < SW_MYSQL_PACKET_HEADER_SIZE + packet_length)
     {
-        return SW_AGAIN;
+        return SW_CONTINUE;
     }
     int packet_number = tmp[3];
     tmp += SW_MYSQL_PACKET_HEADER_SIZE;
@@ -888,7 +888,7 @@ static ssize_t mysql_decode_row(mysql_client *client, char *buf, uint32_t packet
             }
             else
             {
-                read_n = SW_AGAIN;
+                read_n = SW_CONTINUE;
                 goto _error;
             }
         }
@@ -1235,7 +1235,7 @@ static ssize_t mysql_decode_row_prepare(mysql_client *client, char *buf, uint32_
                 }
                 else
                 {
-                    read_n = SW_AGAIN;
+                    read_n = SW_CONTINUE;
                     goto _error;
                 }
             }
@@ -1499,7 +1499,7 @@ static sw_inline int mysql_read_params(mysql_client *client)
         // Ensure that we've received the complete packet
         if (mysql_ensure_packet(p, n_buf) == SW_ERR)
         {
-            return SW_AGAIN;
+            return SW_CONTINUE;
         }
 
         client->response.packet_length = mysql_uint3korr(p);
@@ -1545,7 +1545,7 @@ static sw_inline int mysql_read_rows(mysql_client *client)
         // Ensure that we've received the complete packet
         if (mysql_ensure_packet(p, n_buf) == SW_ERR)
         {
-            return SW_AGAIN;
+            return SW_CONTINUE;
         }
 
         client->response.packet_length = mysql_uint3korr(p);
@@ -1595,9 +1595,9 @@ static sw_inline int mysql_read_rows(mysql_client *client)
         if (sw_unlikely(read_n < 0))
         {
             // TODO: handle all decode error here
-            if (read_n == SW_AGAIN)
+            if (read_n == SW_CONTINUE)
             {
-                return SW_AGAIN;
+                return SW_CONTINUE;
             }
             mysql_columns_free(client);
             return read_n;
@@ -1611,7 +1611,7 @@ static sw_inline int mysql_read_rows(mysql_client *client)
     }
 
     // missing eof or err packet
-    return SW_AGAIN;
+    return SW_CONTINUE;
 }
 
 static int mysql_decode_field(char *buf, int len, mysql_field *col)
@@ -1826,7 +1826,7 @@ static int mysql_read_columns(mysql_client *client)
         // Ensure that we've received the complete packet
         if (mysql_ensure_packet(p, n_buf) == SW_ERR)
         {
-            return SW_AGAIN;
+            return SW_CONTINUE;
         }
 
         client->response.packet_length = mysql_uint3korr(p);
@@ -1855,7 +1855,7 @@ static int mysql_read_columns(mysql_client *client)
     // Ensure that we've received the complete EOF_Packet
     if (mysql_ensure_packet(p, n_buf) == SW_ERR)
     {
-        return SW_AGAIN;
+        return SW_CONTINUE;
     }
 
     client->response.packet_length = mysql_uint3korr(p);
@@ -1894,7 +1894,7 @@ int mysql_is_over(mysql_client *client)
     if (buffer->length < client->want_length)
     {
         swTraceLog(SW_TRACE_MYSQL_CLIENT, "want=%ju, but only=%ju", (uintmax_t) client->want_length, (uintmax_t) buffer->length);
-        return SW_AGAIN;
+        return SW_CONTINUE;
     }
     remaining_size = buffer->length - client->check_offset; // remaining buffer size
     while (remaining_size > 0) // if false: have already check all of the data
@@ -1976,7 +1976,7 @@ int mysql_is_over(mysql_client *client)
         }
     }
 
-    return SW_AGAIN;
+    return SW_CONTINUE;
 }
 
 
@@ -2000,7 +2000,7 @@ int mysql_response(mysql_client *client)
             // Ensure that we've received the complete packet
             if (mysql_ensure_packet(p, n_buf) == SW_ERR)
             {
-                return SW_AGAIN;
+                return SW_CONTINUE;
             }
 
             client->response.packet_length = mysql_uint3korr(p);
@@ -2123,7 +2123,7 @@ int mysql_response(mysql_client *client)
         }
     }
 
-    return SW_AGAIN;
+    return SW_CONTINUE;
 }
 
 static int mysql_query(zval *zobject, mysql_client *client, swString *sql, zval *callback)
@@ -2916,7 +2916,7 @@ static int swoole_mysql_onHandShake(mysql_client *client)
         // handle auth switch request
         switch (next_state = mysql_auth_switch(connector, buffer->str, buffer->length))
         {
-        case SW_AGAIN:
+        case SW_CONTINUE:
             return SW_OK;
         case SW_ERR:
             // not the switch packet, go to the next
@@ -2965,7 +2965,7 @@ static int swoole_mysql_onHandShake(mysql_client *client)
 #ifdef SW_MYSQL_RSA_SUPPORT
         switch (mysql_parse_rsa(connector, SW_STRINGCVL(buffer)))
         {
-        case SW_AGAIN:
+        case SW_CONTINUE:
             return SW_OK;
         case SW_OK:
             ret = SW_MYSQL_HANDSHAKE_WAIT_RESULT; // handshake = ret
