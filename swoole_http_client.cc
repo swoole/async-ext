@@ -122,7 +122,7 @@ typedef struct
 
 } http_client;
 
-extern swString *http_client_buffer;
+swString *http_client_buffer;
 
 static void http_client_onReceive(swClient *cli, char *data, uint32_t length);
 static void http_client_onConnect(swClient *cli);
@@ -544,6 +544,12 @@ void swoole_http_client_init(int module_number)
     zend_declare_property_null(swoole_http_client_ce, ZEND_STRL("onError"), ZEND_ACC_PUBLIC);
     zend_declare_property_null(swoole_http_client_ce, ZEND_STRL("onMessage"), ZEND_ACC_PUBLIC);
     zend_declare_property_null(swoole_http_client_ce, ZEND_STRL("onClose"), ZEND_ACC_PUBLIC);
+
+    http_client_buffer = swString_new(SW_HTTP_RESPONSE_INIT_SIZE);
+    if (!http_client_buffer)
+    {
+        php_swoole_fatal_error(E_ERROR, "[1] swString_new(%d) failed", SW_HTTP_RESPONSE_INIT_SIZE);
+    }
 }
 
 static void http_client_execute_callback(zval *zobject, enum php_swoole_client_callback_type type)
