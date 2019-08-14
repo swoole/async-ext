@@ -26,14 +26,14 @@ function skip(string $reason, bool $is_skip = true, int $color = SWOOLE_COLOR_YE
     }
 }
 
-function skip_php_version_lower_than($require_version = '7.0')
+function skip_if_php_version_lower_than($require_version = '7.0')
 {
     if (version_compare(PHP_VERSION, $require_version, '<')) {
         skip('need php version >= ' . $require_version);
     }
 }
 
-function skip_php_version_between($a, $b)
+function skip_if_php_version_between($a, $b)
 {
     if (version_compare(PHP_VERSION, $a, '>=') && version_compare(PHP_VERSION, $b, '<=')) {
         skip("unsupported php version between {$a} and {$b}");
@@ -42,23 +42,46 @@ function skip_php_version_between($a, $b)
 
 function skip_if_not_debug_version()
 {
-    if (!SWOOLE_DEBUG) {
-        skip('only in swoole debug version');
+    skip('only in swoole debug version', !SWOOLE_DEBUG);
+}
+
+function skip_if_ini_bool_equal_to(string $name, bool $value)
+{
+    if (((bool)ini_get($name)) === $value) {
+        $value = $value ? 'enable' : 'disable';
+        skip("{$name} is {$value}");
     }
+}
+
+function skip_if_constant_not_defined(string $constant_name)
+{
+    require_once __DIR__ . '/config.php';
+    skip("{$constant_name} is not defined", !defined($constant_name));
+}
+
+function skip_if_function_not_exist(string $function_name)
+{
+    skip("{$function_name} not exist", !function_exists($function_name));
 }
 
 function skip_if_class_not_exist(string $class_name)
 {
-    if (!class_exists($class_name, false)) {
-        skip("{$class_name} not exist");
-    }
+    skip("{$class_name} not exist", !class_exists($class_name, false));
+}
+
+function skip_if_extension_not_exist(string $extension_name)
+{
+    skip("{$extension_name} not exist", !extension_loaded($extension_name));
 }
 
 function skip_if_file_not_exist(string $filename)
 {
-    if (!file_exists($filename)) {
-        skip("file {$filename} is not exist");
-    }
+    skip("file {$filename} is not exist", !file_exists($filename));
+}
+
+function skip_if_command_not_found(string $command)
+{
+    skip("command {$command} not found", `{$command} --help | grep -i usage`);
 }
 
 function skip_if_no_ssl()
@@ -80,39 +103,36 @@ function skip_if_openssl_version_lower_than($version = '1.0.0')
 
 function skip_if_no_http2()
 {
-    if (!class_exists("swoole_http2_request", false)) {
-        skip('no http2');
-    }
+    skip('no http2', !class_exists(Swoole\Http2\Request::class, false));
+}
+
+
+function skip_if_no_ipv6()
+{
+    $socket = socket_create(AF_INET6, SOCK_STREAM, SOL_TCP);
+    skip('no ipv6 address', !socket_bind($socket, "::1", 0));
 }
 
 function skip_if_no_top()
 {
     skip_if_darwin();
-    skip_if_alpine_linux();
-    if (stripos(`top help 2>&1`, 'usage') === false) {
-        skip('no top');
-    }
+    skip('top provided by busybox (not support)', !empty(`top --help 2>&1 | grep -i busybox`));
+    skip('no top', empty(`top help 2>&1 | grep usage`));
 }
 
 function skip_if_darwin()
 {
-    if (stripos(PHP_OS, 'Darwin') !== false) {
-        skip('not support on darwin');
-    }
+    skip('not support on darwin', stripos(PHP_OS, 'Darwin') !== false);
 }
 
-function skip_if_alpine_linux()
+function skip_if_musl_libc()
 {
-    if (strpos(`apk 2>&1`, 'apk-tools') !== false) {
-        skip('not support on alpine liunx');
-    }
+    skip('not support when use musl libc', !empty(`ldd 2>&1 | grep -i musl`));
 }
 
 function skip_if_no_process_affinity()
 {
-    if (!method_exists(swoole_process::class, 'setaffinity')) {
-        skip('no process affinity');
-    }
+    skip('no process affinity', !method_exists(Swoole\Process::class, 'setaffinity'));
 }
 
 function skip_if_in_valgrind(string $reason = 'valgrind is too slow')
@@ -132,9 +152,7 @@ function skip_if_in_docker(string $reason = 'not support in docker')
 
 function skip_if_no_proxy(string $host, string $port)
 {
-    if (IS_IN_TRAVIS || check_tcp_port($host, $port) !== 1) {
-        skip('no available proxy');
-    }
+    skip('no available proxy', IS_IN_TRAVIS || check_tcp_port($host, $port) <= 0);
 }
 
 function skip_if_no_http_proxy()
@@ -152,16 +170,14 @@ function skip_if_no_socks5_proxy()
 function skip_if_pdo_not_support_mysql8()
 {
     require_once __DIR__ . '/config.php';
-    if (IS_IN_TRAVIS) {
-        try {
-            new PDO(
-                "mysql:host=" . MYSQL_SERVER_HOST . ";dbname=" . MYSQL_SERVER_DB . ";charset=utf8",
-                MYSQL_SERVER_USER, MYSQL_SERVER_PWD
-            );
-        } catch (\PDOException $e) {
-            if ($e->getCode() === 2054) {
-                skip('pdo auth not support');
-            }
+    try {
+        new PDO(
+            "mysql:host=" . MYSQL_SERVER_HOST . ";port=" . MYSQL_SERVER_PORT . ";dbname=" . MYSQL_SERVER_DB . ";charset=utf8",
+            MYSQL_SERVER_USER, MYSQL_SERVER_PWD
+        );
+    } catch (\PDOException $e) {
+        if ($e->getCode() === 2054) {
+            skip('pdo auth not support');
         }
     }
 }
@@ -169,22 +185,50 @@ function skip_if_pdo_not_support_mysql8()
 function skip_if_not_mysql8()
 {
     require_once __DIR__ . '/config.php';
-    if (!preg_match(
-        '/caching_sha2_password/',
-        $r = curlGet('http://' . MYSQL_SERVER_HOST . ':' . MYSQL_SERVER_PORT))
-    ) {
+    $skip = false;
+    go(function () use (&$skip) {
+        if (!preg_match(
+            '/caching_sha2_password/',
+            httpGetBody('http://' . MYSQL_SERVER_HOST . ':' . MYSQL_SERVER_PORT))
+        ) {
+            $skip = true;
+        }
+    });
+    Swoole\Event::wait();
+    if ($skip) {
         skip('require mysql8');
     }
 }
 
-function skip_deprecated()
+function skip_if_not_redis5()
 {
-    skip('it\'s the deprecated', file_exists('/.travisenv'), SWOOLE_COLOR_WHITE);
+    require_once __DIR__ . '/config.php';
+    $skip = false;
+    go(function () use (&$skip) {
+        $redis = new Swoole\Coroutine\Redis();
+        $redis->setOptions(['compatibility_mode' => true]);
+        $redis->connect(REDIS_SERVER_HOST, REDIS_SERVER_PORT);
+        $info = $redis->eval("return redis.call('info')");
+        if (preg_match('/redis_version:(\d+)/U', $info, $version)) {
+            if ($version[1] < 5) {
+                $skip = true;
+            }
+        }
+    });
+    Swoole\Event::wait();
+    if ($skip) {
+        skip('require redis5');
+    }
+}
+
+function skip_unsupported(string $message = '')
+{
+    skip($message ?: 'the test cannot continue to work for some implementation reasons');
 }
 
 (function () {
     global $argv;
-    skip_php_version_lower_than('7.0');
+    skip_if_php_version_lower_than('7.0');
     if (!getenv('PHPT') && substr($argv[0], -4) === '.php') {
         skip('please read ' . dirname(dirname(__FILE__)) . '/README.md and try again');
     }

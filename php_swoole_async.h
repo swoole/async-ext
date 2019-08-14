@@ -71,6 +71,7 @@ PHP_RINIT_FUNCTION(swoole_async);
 PHP_RSHUTDOWN_FUNCTION(swoole_async);
 PHP_MINFO_FUNCTION(swoole_async);
 
+void php_swoole_async_client_minit(int module_number);
 void swoole_http_client_init(int module_number);
 void swoole_redis_init(int module_number);
 void swoole_mysql_init(int module_number);

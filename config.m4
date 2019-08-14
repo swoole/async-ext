@@ -67,12 +67,13 @@ if test "$PHP_SWOOLE_ASYNC" != "no"; then
     PHP_ADD_LIBRARY(pthread, 1, SWOOLE_SHARED_LIBADD)
 
     swoole_source_file="swoole_async.cc \
+        swoole_async_client.cc \
         swoole_mysql.c \
         swoole_redis.c \
         swoole_msgqueue.c \
         swoole_ringqueue.c \
-	swoole_channel.c \
-	swoole_mmap.c \
+    	swoole_channel.c \
+    	swoole_mmap.c \
         swoole_memory_pool.c \
         swoole_http_client.cc"
 
