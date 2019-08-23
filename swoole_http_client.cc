@@ -340,7 +340,7 @@ static int http_client_execute(zval *zobject, char *uri, size_t uri_len, zval *c
             php_swoole_fatal_error(E_WARNING, "Operation now in progress phase %d.", http->state);
             return SW_ERR;
         }
-        else if (!http->cli->socket->active)
+        else if (!http->cli->active)
         {
             php_swoole_fatal_error(E_WARNING, "connection#%d is closed.", http->cli->socket->fd);
             return SW_ERR;
@@ -494,7 +494,7 @@ static int http_client_execute(zval *zobject, char *uri, size_t uri_len, zval *c
         }
     }
 
-    if (cli->socket->active == 1)
+    if (cli->active == 1)
     {
         php_swoole_fatal_error(E_WARNING, "swoole_http_client is already connected.");
         return SW_ERR;
@@ -647,9 +647,9 @@ static void http_client_onClose(swClient *cli)
     zval_ptr_dtor(zobject);
 }
 
-static int http_client_onMessage(swProtocol *proto, swConnection *conn, char *data, uint32_t length)
+static int http_client_onMessage(swProtocol *proto, swSocket *socket, char *data, uint32_t length)
 {
-    swClient *cli = (swClient *) conn->object;
+    swClient *cli = (swClient *) socket->object;
     zval *zobject = (zval *) cli->object;
     zval args[2];
     zval *retval = NULL;
@@ -807,7 +807,7 @@ static void http_client_onReceive(swClient *cli, char *data, uint32_t length)
         return;
     }
 
-    swConnection *conn = cli->socket; // get connection pointer first because it's on Reactor so that it always be safe
+    swSocket *conn = cli->socket; // get connection pointer first because it's on Reactor so that it always be safe
     zval *retval = NULL;
     http_client_property *hcc = (http_client_property *) swoole_get_property(zobject, 0);
     zval *zcallback = hcc->onResponse;
@@ -861,7 +861,7 @@ static void http_client_onReceive(swClient *cli, char *data, uint32_t length)
     sw_zval_free(zcallback);
 
     // maybe close in callback, check it
-    if (conn->active == 0)
+    if (cli->active == 0)
     {
         return;
     }
@@ -900,7 +900,7 @@ static int http_client_send_http_request(zval *zobject)
         return SW_ERR;
     }
 
-    if (!http->cli->socket && http->cli->socket->active == 0)
+    if (!http->cli->socket && http->cli->active == 0)
     {
         php_swoole_error(E_WARNING, "server is not connected.");
         return SW_ERR;
@@ -1720,7 +1720,7 @@ static PHP_METHOD(swoole_http_client, isConnected)
     {
         RETURN_FALSE;
     }
-    RETURN_BOOL(http->cli->socket->active);
+    RETURN_BOOL(http->cli->active);
 }
 
 static PHP_METHOD(swoole_http_client, close)
@@ -1741,7 +1741,7 @@ static PHP_METHOD(swoole_http_client, close)
         php_swoole_error(E_WARNING, "not connected to the server");
         RETURN_FALSE;
     }
-    if (cli->socket->closed)
+    if (cli->closed)
     {
         php_swoole_error(E_WARNING, "client socket is closed.");
         RETURN_FALSE;

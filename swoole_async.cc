@@ -1598,7 +1598,7 @@ PHP_METHOD(swoole_async, exec)
     }
     else
     {
-        swConnection *_socket = swReactor_get(SwooleG.main_reactor, ps->fd);
+        swSocket *_socket = swReactor_get(SwooleG.main_reactor, ps->fd);
         _socket->object = ps;
         RETURN_LONG(pid);
     }

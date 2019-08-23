@@ -377,6 +377,7 @@ typedef struct _mysql_client
     int fd;
     uint32_t transaction :1;
     uint32_t connected :1;
+    uint32_t closing :1;
 
     mysql_connector connector;
     mysql_statement *statement;

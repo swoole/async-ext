@@ -139,7 +139,7 @@ static sw_inline void client_execute_callback(zval *zobject, enum php_swoole_cli
 static sw_inline swClient* client_get_ptr(zval *zobject)
 {
     swClient *cli = (swClient *) swoole_get_object(zobject);
-    if (cli && cli->socket && cli->socket->active == 1)
+    if (cli && cli->socket && cli->active == 1)
     {
         return cli;
     }
@@ -552,7 +552,7 @@ static PHP_METHOD(swoole_async_client, connect)
         sock_flag = 1;
     }
 
-    if (cli->socket->active == 1)
+    if (cli->active == 1)
     {
         php_swoole_fatal_error(E_WARNING, "connection to the server has already been established");
         RETURN_FALSE;
@@ -724,7 +724,7 @@ static PHP_METHOD(swoole_async_client, sendto)
         {
             RETURN_FALSE;
         }
-        cli->socket->active = 1;
+        cli->active = 1;
         swoole_set_object(ZEND_THIS, cli);
     }
 
@@ -804,7 +804,7 @@ static PHP_METHOD(swoole_async_client, isConnected)
     {
         RETURN_FALSE;
     }
-    RETURN_BOOL(cli->socket->active);
+    RETURN_BOOL(cli->active);
 }
 
 static PHP_METHOD(swoole_async_client, getsockname)
@@ -935,12 +935,12 @@ static PHP_METHOD(swoole_async_client, close)
         php_swoole_fatal_error(E_WARNING, "client is not connected to the server");
         RETURN_FALSE;
     }
-    if (cli->socket->closed)
+    if (cli->closed)
     {
         php_swoole_error(E_WARNING, "client socket is closed");
         RETURN_FALSE;
     }
-    if (cli->socket->active == 0)
+    if (cli->active == 0)
     {
         zval *zobject = ZEND_THIS;
         zval_ptr_dtor(zobject);
