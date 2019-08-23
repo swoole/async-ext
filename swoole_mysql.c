@@ -2803,8 +2803,8 @@ static void swoole_mysql_onConnect(mysql_client *client)
 
 static int swoole_mysql_onWrite(swReactor *reactor, swEvent *event)
 {
-    mysql_client *client = event->socket->object;
-    if (client->cli->active)
+    swClient *cli = event->socket->object;
+    if (cli->active)
     {
         return swReactor_onWrite(SwooleG.main_reactor, event);
     }
@@ -2816,13 +2816,14 @@ static int swoole_mysql_onWrite(swReactor *reactor, swEvent *event)
         return SW_ERR;
     }
 
+    mysql_client *client = cli->object;
     //success
     if (SwooleG.error == 0)
     {
         //listen read event
         SwooleG.main_reactor->set(SwooleG.main_reactor, event->fd, PHP_SWOOLE_FD_MYSQL | SW_EVENT_READ);
         //connected
-        client->cli->active = 1;
+        cli->active = 1;
         client->handshake = SW_MYSQL_HANDSHAKE_WAIT_REQUEST;
     }
     else
