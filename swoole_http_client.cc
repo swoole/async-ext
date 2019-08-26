@@ -1299,7 +1299,7 @@ static int http_client_send_http_request(zval *zobject)
 
     if (http->timeout > 0)
     {
-        http->timer = swTimer_add(&SwooleG.timer, (long) (http->timeout * 1000), 0, http->cli, http_client_onRequestTimeout);
+        http->timer = swoole_timer_add((long) (http->timeout * 1000), 0, http_client_onRequestTimeout, http->cli);
     }
 
     swTrace("[%d]: %s\n", (int) http_client_buffer->length, http_client_buffer->str);
@@ -1312,7 +1312,7 @@ static void http_client_clear(http_client *http)
     // clear timeout timer
     if (http->timer)
     {
-        swTimer_del(&SwooleG.timer, http->timer);
+        swoole_timer_del(http->timer);
         http->timer = NULL;
     }
 

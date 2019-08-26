@@ -24,6 +24,9 @@
 #endif
 
 #include "ext/swoole/php_swoole.h"
+#include "ext/swoole/swoole_config.h"
+#include "ext/swoole/include/client.h"
+#include "ext/swoole/include/swoole_api.h"
 
 #ifndef SW_MYSQL_CONNECT_TIMEOUT
 #define SW_MYSQL_CONNECT_TIMEOUT         1.0

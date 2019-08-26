@@ -345,34 +345,34 @@ static void php_swoole_async_client_free(zval *zobject, swClient *cli)
 {
     if (cli->timer)
     {
-        swTimer_del(&SwooleG.timer, cli->timer);
+        swoole_timer_del(cli->timer);
         cli->timer = NULL;
     }
     //socks5 proxy config
     if (cli->socks5_proxy)
     {
-        efree(cli->socks5_proxy->host);
+        efree((void* )cli->socks5_proxy->host);
         if (cli->socks5_proxy->username)
         {
-            efree(cli->socks5_proxy->username);
+            efree((void* )cli->socks5_proxy->username);
         }
         if (cli->socks5_proxy->password)
         {
-            efree(cli->socks5_proxy->password);
+            efree((void* )cli->socks5_proxy->password);
         }
         efree(cli->socks5_proxy);
     }
     //http proxy config
     if (cli->http_proxy)
     {
-        efree(cli->http_proxy->proxy_host);
+        efree((void* ) cli->http_proxy->proxy_host);
         if (cli->http_proxy->user)
         {
-            efree(cli->http_proxy->user);
+            efree((void* )cli->http_proxy->user);
         }
         if (cli->http_proxy->password)
         {
-            efree(cli->http_proxy->password);
+            efree((void* )cli->http_proxy->password);
         }
         efree(cli->http_proxy);
     }
@@ -1093,7 +1093,7 @@ static PHP_METHOD(swoole_async_client, enableSSL)
     cli->ssl_wait_handshake = 1;
     cli->socket->ssl_state = SW_SSL_STATE_WAIT_STREAM;
 
-    SwooleG.main_reactor->set(SwooleG.main_reactor, cli->socket->fd, SW_FD_STREAM_CLIENT | SW_EVENT_WRITE);
+    swoole_event_set(cli->socket->fd, SW_EVENT_WRITE, SW_FD_STREAM_CLIENT);
 
     RETURN_TRUE;
 }
