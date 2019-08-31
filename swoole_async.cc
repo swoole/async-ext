@@ -512,7 +512,7 @@ static void aio_onFileCompleted(swAio_event *event)
             ev.handler = swAio_handler_read;
             ev.callback = aio_onFileCompleted;
 
-            int ret = swAio_dispatch(&ev);
+            ssize_t ret = swAio_dispatch(&ev);
             if (ret < 0)
             {
                 php_swoole_fatal_error(E_WARNING, "swoole_async: continue to read failed. Error: %s[%d]", strerror(event->error), event->error);
@@ -626,7 +626,7 @@ PHP_FUNCTION(swoole_async_read)
     ev.callback = aio_onFileCompleted;
 
     php_swoole_check_reactor();
-    int ret = swAio_dispatch(&ev);
+    ssize_t ret = swAio_dispatch(&ev);
     if (ret == SW_ERR)
     {
         RETURN_FALSE;
@@ -733,7 +733,7 @@ PHP_FUNCTION(swoole_async_write)
     ev.callback = aio_onFileCompleted;
 
     php_swoole_check_reactor();
-    int ret = swAio_dispatch(&ev);
+    ssize_t ret = swAio_dispatch(&ev);
     if (ret == SW_ERR)
     {
         RETURN_FALSE;
@@ -820,7 +820,7 @@ PHP_FUNCTION(swoole_async_readfile)
     ev.callback = aio_onFileCompleted;
 
     php_swoole_check_reactor();
-    int ret = swAio_dispatch(&ev);
+    ssize_t ret = swAio_dispatch(&ev);
     if (ret == SW_ERR)
     {
         RETURN_FALSE;
@@ -920,7 +920,7 @@ PHP_FUNCTION(swoole_async_writefile)
     ev.callback = aio_onFileCompleted;
 
     php_swoole_check_reactor();
-    int ret = swAio_dispatch(&ev);
+    ssize_t ret = swAio_dispatch(&ev);
     if (ret == SW_ERR)
     {
         RETURN_FALSE;

@@ -483,7 +483,7 @@ typedef struct _mysql_client
 #define MYSQL_RESPONSE_BUFFER  (client->cmd == SW_MYSQL_COM_STMT_EXECUTE ? client->statement->buffer : client->buffer)
 
 int mysql_get_result(mysql_connector *connector, char *buf, int len);
-int mysql_get_charset(char *name);
+char mysql_get_charset(const char *name);
 int mysql_handshake(mysql_connector *connector, char *buf, int len);
 int mysql_parse_auth_signature(swString *buffer, mysql_connector *connector);
 int mysql_parse_rsa(mysql_connector *connector, char *buf, int len);
