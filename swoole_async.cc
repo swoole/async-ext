@@ -971,11 +971,11 @@ PHP_FUNCTION(swoole_async_set)
     }
     if (php_swoole_array_get_value(vht, "thread_num", v) || php_swoole_array_get_value(vht, "min_thread_num", v))
     {
-        SwooleAIO.max_thread_count = SwooleAIO.min_thread_count = zval_get_long(v);
+        SwooleAIO.max_thread_num = SwooleAIO.min_thread_num = zval_get_long(v);
     }
     if (php_swoole_array_get_value(vht, "max_thread_num", v))
     {
-        SwooleAIO.max_thread_count = zval_get_long(v);
+        SwooleAIO.max_thread_num = zval_get_long(v);
     }
     if (php_swoole_array_get_value(vht, "display_errors", v))
     {
