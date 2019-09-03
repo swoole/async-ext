@@ -32,8 +32,8 @@ typedef struct
     zval *filename;
     uint32_t *refcount;
     off_t offset;
-    uint16_t type;
     uint8_t once;
+    uint8_t read_op;
     char *content;
     uint32_t length;
 } file_request;
@@ -407,13 +407,13 @@ static void aio_onFileCompleted(swAio_event *event)
         {
             php_swoole_fatal_error(E_WARNING, "ret_length[%d] < req->length[%d].", (int ) ret, file_req->length);
         }
-        else if (event->type == SW_AIO_READ)
+        else if (file_req->read_op)
         {
             file_req->offset += event->ret;
         }
     }
 
-    if (event->type == SW_AIO_READ)
+    if (file_req->read_op)
     {
         if (ret < 0)
         {
@@ -426,17 +426,13 @@ static void aio_onFileCompleted(swAio_event *event)
         args[0] = *file_req->filename;
         args[1] = *zcontent;
     }
-    else if (event->type == SW_AIO_WRITE)
+    else
     {
         ZVAL_LONG(zwriten, ret);
         args[0] = *file_req->filename;
         args[1] = *zwriten;
     }
-    else
-    {
-        php_swoole_fatal_error(E_WARNING, "swoole_async: onFileCompleted unknown event type[%d].", event->type);
-        return;
-    }
+
 
     if (zcallback)
     {
@@ -474,7 +470,7 @@ static void aio_onFileCompleted(swAio_event *event)
         }
         php_swoole_file_request_free(file_req);
     }
-    else if(file_req->type == SW_AIO_WRITE)
+    else if(!file_req->read_op)
     {
         if (retval && !ZVAL_IS_NULL(retval) && !Z_BVAL_P(retval))
         {
@@ -504,7 +500,6 @@ static void aio_onFileCompleted(swAio_event *event)
             ev.canceled = 0;
             ev.fd = event->fd;
             ev.buf = event->buf;
-            ev.type = SW_AIO_READ;
             ev.nbytes = event->nbytes;
             ev.offset = file_req->offset;
             ev.flags = 0;
@@ -609,7 +604,7 @@ PHP_FUNCTION(swoole_async_read)
     req->refcount = nullptr;
     req->content = (char*) fcnt;
     req->once = 0;
-    req->type = SW_AIO_READ;
+    req->read_op = 1;
     req->length = buf_size;
     req->offset = offset;
 
@@ -617,7 +612,6 @@ PHP_FUNCTION(swoole_async_read)
     ev.canceled = 0;
     ev.fd = fd;
     ev.buf = fcnt;
-    ev.type = SW_AIO_READ;
     ev.nbytes = buf_size;
     ev.offset = offset;
     ev.flags = 0;
@@ -700,7 +694,7 @@ PHP_FUNCTION(swoole_async_write)
     char *wt_cnt = (char *) emalloc(fcnt_len);
     req->content = wt_cnt;
     req->once = 0;
-    req->type = SW_AIO_WRITE;
+    req->read_op = 0;
     req->length = fcnt_len;
     req->offset = offset;
     req->filename = filename;
@@ -724,7 +718,6 @@ PHP_FUNCTION(swoole_async_write)
     ev.canceled = 0;
     ev.fd = fd;
     ev.buf = wt_cnt;
-    ev.type = SW_AIO_WRITE;
     ev.nbytes = fcnt_len;
     ev.offset = offset;
     ev.flags = 0;
@@ -803,7 +796,7 @@ PHP_FUNCTION(swoole_async_readfile)
     req->refcount = nullptr;
     req->content = (char *) emalloc(length);
     req->once = 1;
-    req->type = SW_AIO_READ;
+    req->read_op = 1;
     req->length = length;
     req->offset = 0;
 
@@ -811,7 +804,6 @@ PHP_FUNCTION(swoole_async_readfile)
     ev.canceled = 0;
     ev.fd = fd;
     ev.buf = req->content;
-    ev.type = SW_AIO_READ;
     ev.nbytes = length;
     ev.offset = 0;
     ev.flags = 0;
@@ -899,7 +891,7 @@ PHP_FUNCTION(swoole_async_writefile)
         req->callback = NULL;
     }
     req->refcount = nullptr;
-    req->type = SW_AIO_WRITE;
+    req->read_op = 0;
     req->content = wt_cnt;
     req->once = 1;
     req->length = fcnt_len;
@@ -911,7 +903,6 @@ PHP_FUNCTION(swoole_async_writefile)
     ev.canceled = 0;
     ev.fd = fd;
     ev.buf = wt_cnt;
-    ev.type = SW_AIO_WRITE;
     ev.nbytes = memory_size;
     ev.offset = 0;
     ev.flags = 0;
@@ -971,11 +962,11 @@ PHP_FUNCTION(swoole_async_set)
     }
     if (php_swoole_array_get_value(vht, "thread_num", v) || php_swoole_array_get_value(vht, "min_thread_num", v))
     {
-        SwooleAIO.max_thread_num = SwooleAIO.min_thread_num = zval_get_long(v);
+        SwooleG.aio_core_worker_num = SwooleG.aio_worker_num = zval_get_long(v);
     }
     if (php_swoole_array_get_value(vht, "max_thread_num", v))
     {
-        SwooleAIO.max_thread_num = zval_get_long(v);
+        SwooleG.aio_worker_num = zval_get_long(v);
     }
     if (php_swoole_array_get_value(vht, "display_errors", v))
     {
@@ -1465,7 +1456,6 @@ PHP_FUNCTION(swoole_async_dns_lookup)
     ev.canceled = 0;
     ev.fd = 0;
     ev.buf = buf;
-    ev.type = SW_AIO_WRITE;
     ev.nbytes = buf_size;
     ev.offset = 0;
     ev.flags = 0;
