@@ -924,7 +924,7 @@ PHP_FUNCTION(swoole_async_writefile)
 
 PHP_FUNCTION(swoole_async_set)
 {
-    if (SwooleTG.reactor != NULL)
+    if (sw_reactor() != NULL)
     {
         php_swoole_fatal_error(E_ERROR, "eventLoop has already been created. unable to change settings.");
         RETURN_FALSE;
@@ -1234,7 +1234,7 @@ static int swDNSResolver_onReceive(swReactor *reactor, swEvent *event)
 
     if (swHashMap_count(request_map) == 0)
     {
-        SwooleTG.reactor->del(SwooleTG.reactor, resolver_socket->socket->fd);
+        sw_reactor()->del(sw_reactor(), resolver_socket->socket->fd);
     }
 
     return SW_OK;
@@ -1360,14 +1360,14 @@ static int swDNSResolver_request(char *domain, void (*callback)(char *, swDNSRes
         } while (0);
     }
 
-    if (!swReactor_isset_handler(SwooleTG.reactor, SW_FD_DNS_RESOLVER))
+    if (!swReactor_isset_handler(sw_reactor(), SW_FD_DNS_RESOLVER))
     {
-        swReactor_set_handler(SwooleTG.reactor, SW_FD_DNS_RESOLVER, swDNSResolver_onReceive);
+        swReactor_set_handler(sw_reactor(), SW_FD_DNS_RESOLVER, swDNSResolver_onReceive);
     }
 
-    if (!swReactor_exists(SwooleTG.reactor, resolver_socket->socket->fd))
+    if (!swReactor_exists(sw_reactor(), resolver_socket->socket->fd))
     {
-        if (SwooleTG.reactor->add(SwooleTG.reactor, resolver_socket->socket->fd, SW_FD_DNS_RESOLVER) < 0)
+        if (sw_reactor()->add(sw_reactor(), resolver_socket->socket->fd, SW_FD_DNS_RESOLVER) < 0)
         {
             goto _do_close;
         }
@@ -1492,7 +1492,7 @@ static int process_stream_onRead(swReactor *reactor, swEvent *event)
     zval *retval = NULL;
     zval args[2];
 
-    SwooleTG.reactor->del(SwooleTG.reactor, ps->fd);
+    sw_reactor()->del(sw_reactor(), ps->fd);
 
     if (ps->buffer->length == 0)
     {
@@ -1552,10 +1552,10 @@ PHP_METHOD(swoole_async, exec)
     }
 
     php_swoole_check_reactor();
-    if (!swReactor_isset_handler(SwooleTG.reactor, PHP_SWOOLE_FD_PROCESS_STREAM))
+    if (!swReactor_isset_handler(sw_reactor(), PHP_SWOOLE_FD_PROCESS_STREAM))
     {
-        swReactor_set_handler(SwooleTG.reactor, PHP_SWOOLE_FD_PROCESS_STREAM | SW_EVENT_READ, process_stream_onRead);
-        swReactor_set_handler(SwooleTG.reactor, PHP_SWOOLE_FD_PROCESS_STREAM | SW_EVENT_ERROR, process_stream_onRead);
+        swReactor_set_handler(sw_reactor(), PHP_SWOOLE_FD_PROCESS_STREAM | SW_EVENT_READ, process_stream_onRead);
+        swReactor_set_handler(sw_reactor(), PHP_SWOOLE_FD_PROCESS_STREAM | SW_EVENT_ERROR, process_stream_onRead);
     }
 
     pid_t pid;
@@ -1580,7 +1580,7 @@ PHP_METHOD(swoole_async, exec)
     ps->pid = pid;
     ps->buffer = buffer;
 
-    if (SwooleTG.reactor->add(SwooleTG.reactor, ps->fd, PHP_SWOOLE_FD_PROCESS_STREAM | SW_EVENT_READ) < 0)
+    if (sw_reactor()->add(sw_reactor(), ps->fd, PHP_SWOOLE_FD_PROCESS_STREAM | SW_EVENT_READ) < 0)
     {
         sw_zval_free(ps->callback);
         efree(ps);
@@ -1588,7 +1588,7 @@ PHP_METHOD(swoole_async, exec)
     }
     else
     {
-        swSocket *_socket = swReactor_get(SwooleTG.reactor, ps->fd);
+        swSocket *_socket = swReactor_get(sw_reactor(), ps->fd);
         _socket->object = ps;
         RETURN_LONG(pid);
     }
