@@ -2387,7 +2387,7 @@ static int mysql_query(zval *zobject, mysql_client *client, swString *sql, zval 
         return SW_ERR;
     }
     //send query
-    if (SwooleTG.reactor->write(SwooleTG.reactor, client->fd, mysql_request_buffer->str, mysql_request_buffer->length) < 0)
+    if (sw_reactor()->write(sw_reactor(), client->fd, mysql_request_buffer->str, mysql_request_buffer->length) < 0)
     {
         //connection is closed
         if (swConnection_error(errno) == SW_CLOSE)
@@ -2589,11 +2589,11 @@ static PHP_METHOD(swoole_mysql, connect)
     }
 
     php_swoole_check_reactor();
-    if (!swReactor_isset_handler(SwooleTG.reactor, PHP_SWOOLE_FD_MYSQL))
+    if (!swReactor_isset_handler(sw_reactor(), PHP_SWOOLE_FD_MYSQL))
     {
-        swReactor_set_handler(SwooleTG.reactor, PHP_SWOOLE_FD_MYSQL | SW_EVENT_READ, swoole_mysql_onRead);
-        swReactor_set_handler(SwooleTG.reactor, PHP_SWOOLE_FD_MYSQL | SW_EVENT_WRITE, swoole_mysql_onWrite);
-        swReactor_set_handler(SwooleTG.reactor, PHP_SWOOLE_FD_MYSQL | SW_EVENT_ERROR, swoole_mysql_onError);
+        swReactor_set_handler(sw_reactor(), PHP_SWOOLE_FD_MYSQL | SW_EVENT_READ, swoole_mysql_onRead);
+        swReactor_set_handler(sw_reactor(), PHP_SWOOLE_FD_MYSQL | SW_EVENT_WRITE, swoole_mysql_onWrite);
+        swReactor_set_handler(sw_reactor(), PHP_SWOOLE_FD_MYSQL | SW_EVENT_ERROR, swoole_mysql_onError);
     }
     //create socket
     if (swClient_create(cli, type, 0) < 0)
@@ -2651,7 +2651,7 @@ static PHP_METHOD(swoole_mysql, connect)
     sw_copy_to_stack(client->object, client->_object);
     Z_TRY_ADDREF_P(client->object);
 
-    swSocket *_socket = swReactor_get(SwooleTG.reactor, cli->socket->fd);
+    swSocket *_socket = swReactor_get(sw_reactor(), cli->socket->fd);
     _socket->object = client;
 
     _return:
@@ -2873,9 +2873,9 @@ static PHP_METHOD(swoole_mysql, close)
     }
 
     zend_update_property_bool(swoole_mysql_ce, ZEND_THIS, ZEND_STRL("connected"), 0);
-    SwooleTG.reactor->del(SwooleTG.reactor, client->fd);
+    sw_reactor()->del(sw_reactor(), client->fd);
 
-    swSocket *socket = swReactor_get(SwooleTG.reactor, client->fd);
+    swSocket *socket = swReactor_get(sw_reactor(), client->fd);
     bzero(socket, sizeof(swConnection));
     socket->removed = 1;
 
@@ -3027,7 +3027,7 @@ static int swoole_mysql_onWrite(swReactor *reactor, swEvent *event)
     mysql_client *client = event->socket->object;
     if (client->cli->active)
     {
-        return swReactor_onWrite(SwooleTG.reactor, event);
+        return swReactor_onWrite(sw_reactor(), event);
     }
 
     socklen_t len = sizeof(SwooleG.error);
@@ -3041,7 +3041,7 @@ static int swoole_mysql_onWrite(swReactor *reactor, swEvent *event)
     if (SwooleG.error == 0)
     {
         //listen read event
-        SwooleTG.reactor->set(SwooleTG.reactor, event->fd, PHP_SWOOLE_FD_MYSQL | SW_EVENT_READ);
+        sw_reactor()->set(sw_reactor(), event->fd, PHP_SWOOLE_FD_MYSQL | SW_EVENT_READ);
         //connected
         client->cli->active = 1;
         client->handshake = SW_MYSQL_HANDSHAKE_WAIT_REQUEST;
@@ -3284,7 +3284,7 @@ static int swoole_mysql_onRead(swReactor *reactor, swEvent *event)
                 if (swString_extend(buffer, buffer->size * 2) < 0)
                 {
                     php_swoole_fatal_error(E_ERROR, "malloc failed.");
-                    reactor->del(SwooleTG.reactor, event->fd);
+                    reactor->del(sw_reactor(), event->fd);
                 }
                 continue;
             }
@@ -3338,7 +3338,7 @@ static int swoole_mysql_onRead(swReactor *reactor, swEvent *event)
             }
             //free callback object
             sw_zval_free(callback);
-            swSocket *_socket = swReactor_get(SwooleTG.reactor, event->fd);
+            swSocket *_socket = swReactor_get(sw_reactor(), event->fd);
             if (_socket->object)
             {
                 //clear buffer
