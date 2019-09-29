@@ -371,11 +371,9 @@ typedef struct _mysql_client
     uint32_t switch_check :1; /* check if server request auth switch */
     uint8_t handshake;
     uint8_t cmd; /* help with judging to do what in callback */
-    swString *buffer; /* save the mysql responses data */
     swClient *cli;
     zval *object;
     zval *callback;
-    zval *onClose;
     int fd;
     uint32_t transaction :1;
     uint32_t connected :1;
@@ -388,7 +386,6 @@ typedef struct _mysql_client
     swTimer_node *timer;
 
     zval _object;
-    zval _onClose;
 
     size_t want_length;
     off_t check_offset;
@@ -417,10 +414,13 @@ typedef struct _mysql_client
 #define SW_MYSQL_GROUP_FLAG              32768
 #define SW_MYSQL_NUM_FLAG                32768
 
-#define SW_MYSQL_PACKET_OK   0x0
-#define SW_MYSQL_PACKET_NULL 0xfb
-#define SW_MYSQL_PACKET_EOF  0xfe
-#define SW_MYSQL_PACKET_ERR  0xff
+enum swMySQL_packet_type
+{
+    SW_MYSQL_PACKET_OK = 0x0,
+    SW_MYSQL_PACKET_NULL = 0xfb,
+    SW_MYSQL_PACKET_EOF = 0xfe,
+    SW_MYSQL_PACKET_ERR = 0xff,
+};
 
 /* int<3>	payload_length + int<1>	sequence_id */
 #define SW_MYSQL_PACKET_HEADER_SIZE   4
@@ -480,7 +480,7 @@ typedef struct _mysql_client
                 mysql_int4store((T),def_temp); \
                 mysql_int4store((T+4),def_temp2); } while (0)
 
-#define MYSQL_RESPONSE_BUFFER  (client->cmd == SW_MYSQL_COM_STMT_EXECUTE ? client->statement->buffer : client->buffer)
+#define MYSQL_RESPONSE_BUFFER  (client->cmd == SW_MYSQL_COM_STMT_EXECUTE ? client->statement->buffer : client->cli->buffer)
 
 int mysql_get_result(mysql_connector *connector, char *buf, int len);
 char mysql_get_charset(const char *name);
