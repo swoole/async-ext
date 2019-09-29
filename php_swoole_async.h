@@ -57,8 +57,16 @@ static sw_inline int sw_call_user_function_ex(HashTable *function_table, zval* o
 {
     static zval _retval;
     int ret;
-    *retval_ptr_ptr = &_retval;
+
+    if (retval_ptr_ptr != NULL)
+    {
+        *retval_ptr_ptr = &_retval;
+    }
     ret = call_user_function_ex(function_table, object_p, function_name, &_retval, param_count, param_count ? params : NULL, no_separation, ymbol_table);
+    if (retval_ptr_ptr == NULL)
+    {
+        zval_ptr_dtor(&_retval);
+    }
     if (UNEXPECTED(EG(exception)))
     {
         zend_exception_error(EG(exception), E_ERROR);

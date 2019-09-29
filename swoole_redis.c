@@ -251,7 +251,8 @@ static PHP_METHOD(swoole_redis, __construct)
             }
             else
             {
-                redis->database = (int8_t) zval_get_long(ztmp);
+                zend_long v = zval_get_long(ztmp);
+                redis->database = SW_MAX(0, SW_MIN(v, INT8_MAX));
             }
         }
     }
