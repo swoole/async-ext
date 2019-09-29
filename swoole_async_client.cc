@@ -298,17 +298,8 @@ static void client_onConnect(swClient *cli)
     }
     else
 #endif
-    if (!cli->redirect)
     {
         client_execute_callback(zobject, SW_CLIENT_CB_onConnect);
-    }
-    else
-    {
-        client_callback *cb = (client_callback *) swoole_get_property(zobject, 0);
-        if (!cb || !cb->cache_onReceive.function_handler)
-        {
-            php_swoole_fatal_error(E_ERROR, "has no onReceive callback");
-        }
     }
 }
 
