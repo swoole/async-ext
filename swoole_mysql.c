@@ -784,7 +784,7 @@ int mysql_auth_switch(mysql_connector *connector, char *buf, int len)
     if ((uint8_t) tmp[4] != SW_MYSQL_PACKET_EOF)
     {
         // out of the order packet
-        return SW_ERROR;
+        return SW_ERR;
     }
 
     int next_state = SW_MYSQL_HANDSHAKE_WAIT_RESULT;
@@ -2836,7 +2836,7 @@ static PHP_METHOD(swoole_mysql, close)
         php_swoole_error(E_WARNING, "client socket is closed");
         RETURN_FALSE;
     }
-    int ret;
+    int ret = 0;
     if (sw_unlikely(SWOOLE_G(req_status) != PHP_SWOOLE_CALL_USER_SHUTDOWNFUNC_BEGIN))
     {
         ret = cli->close(cli);
@@ -3070,6 +3070,7 @@ static int swoole_mysql_onHandShake(mysql_client *client, char *data, ssize_t n)
     {
     case SW_MYSQL_HANDSHAKE_WAIT_REQUEST:
     {
+        client->switch_check = 1;
         ret = mysql_handshake(connector, buffer->str, buffer->length);
         if (ret < 0)
         {
@@ -3092,10 +3093,6 @@ static int swoole_mysql_onHandShake(mysql_client *client, char *data, ssize_t n)
                 swString_clear(buffer);
                 // mysql_handshake will return the next state flag
                 client->handshake = ret;
-                if (ret != SW_MYSQL_HANDSHAKE_WAIT_RESULT)
-                {
-                    client->switch_check = 1;
-                }
             }
         }
         break;
