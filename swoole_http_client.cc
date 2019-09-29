@@ -642,7 +642,6 @@ static void http_client_onClose(swClient *cli)
     }
 
     http_client_free(zobject);
-
     http_client_execute_callback(zobject, SW_CLIENT_CB_onClose);
     zval_ptr_dtor(zobject);
 }

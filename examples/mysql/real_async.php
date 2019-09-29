@@ -37,3 +37,5 @@ $r = $db->connect($server, function ($db, $result)
         $db->close();
     });
 });
+
+Swoole\Event::wait();

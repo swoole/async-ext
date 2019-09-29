@@ -5,7 +5,6 @@ swoole_mysql: query multifield
 --FILE--
 <?php
 require __DIR__ . '/../include/bootstrap.php';
-require __DIR__ . '/../include/api/swoole_mysql/swoole_mysql_init.php';
 
 define('FIELD_NUM', 8192);
 

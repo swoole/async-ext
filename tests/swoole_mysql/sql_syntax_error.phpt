@@ -5,7 +5,6 @@ swoole_mysql: sql syntax error
 --FILE--
 <?php
 require __DIR__ . '/../include/bootstrap.php';
-require __DIR__ . '/../include/api/swoole_mysql/swoole_mysql_init.php';
 
 swoole_mysql_query("select", function($mysql, $result) {
     if ($mysql->errno === 1064) {
@@ -15,6 +14,7 @@ swoole_mysql_query("select", function($mysql, $result) {
     }
     $mysql->close();
 });
+Swoole\Event::wait();
 ?>
 --EXPECT--
 SUCCESS
