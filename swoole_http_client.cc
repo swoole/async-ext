@@ -2239,7 +2239,8 @@ static PHP_METHOD(swoole_http_client, push)
     }
 
     swString_clear(http_client_buffer);
-    if (php_swoole_websocket_frame_pack(http_client_buffer, zdata, opcode, fin, http->websocket_mask) < 0)
+    uint8_t flags = swWebSocket_set_flags(fin, http->websocket_mask, 0, 0, 0);
+    if (php_swoole_websocket_frame_pack(http_client_buffer, zdata, opcode, flags) < 0)
     {
         RETURN_FALSE;
     }
