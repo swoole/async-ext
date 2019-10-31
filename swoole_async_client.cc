@@ -442,7 +442,7 @@ static PHP_METHOD(swoole_async_client, __construct)
     php_swoole_check_reactor();
 
     int client_type = php_swoole_socktype(type);
-    if (client_type < SW_SOCK_TCP || client_type > SW_SOCK_UNIX_STREAM)
+    if (client_type < SW_SOCK_TCP || client_type > SW_SOCK_UNIX_DGRAM)
     {
         const char *space, *class_name = get_active_class_name(&space);
         zend_type_error(

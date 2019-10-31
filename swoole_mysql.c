@@ -416,6 +416,7 @@ static void swoole_mysql_onConnect(mysql_client *client);
 void swoole_mysql_init(int module_number)
 {
     SW_INIT_CLASS_ENTRY(swoole_mysql, "Swoole\\MySQL", "swoole_mysql", NULL, swoole_mysql_methods);
+    SW_CLASS_ALIAS("Swoole\\Async\\MySQL", swoole_mysql);
     SW_SET_CLASS_SERIALIZABLE(swoole_mysql, zend_class_serialize_deny, zend_class_unserialize_deny);
     SW_SET_CLASS_CLONEABLE(swoole_mysql, sw_zend_class_clone_deny);
     SW_SET_CLASS_UNSET_PROPERTY_HANDLER(swoole_mysql, sw_zend_class_unset_property_deny);
