@@ -15,7 +15,8 @@
   |         Tianfeng Han  <mikan.tenny@gmail.com>                        |
   +----------------------------------------------------------------------+
  */
-#include "php_swoole.h"
+
+#include "php_swoole_async.h"
 
 enum memory_pool_type
 {

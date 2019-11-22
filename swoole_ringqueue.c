@@ -16,8 +16,7 @@
  +----------------------------------------------------------------------+
  */
 
-
-#include "php_swoole.h"
+#include "php_swoole_async.h"
 
 static PHP_METHOD(swoole_ringqueue, __construct);
 static PHP_METHOD(swoole_ringqueue, __destruct);

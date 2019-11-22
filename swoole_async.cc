@@ -248,6 +248,102 @@ zend_module_entry swoole_async_module_entry =
 ZEND_GET_MODULE(swoole_async)
 #endif
 
+swoole_object_array swoole_objects;
+
+static sw_inline uint32_t swoole_get_new_size(uint32_t old_size, int handle)
+{
+    uint32_t new_size = old_size * 2;
+    if (handle > SWOOLE_OBJECT_MAX)
+    {
+        php_swoole_fatal_error(E_ERROR, "handle %d exceed %d", handle, SWOOLE_OBJECT_MAX);
+        return 0;
+    }
+    while (new_size <= (uint32_t) handle)
+    {
+        new_size *= 2;
+    }
+    if (new_size > SWOOLE_OBJECT_MAX)
+    {
+        new_size = SWOOLE_OBJECT_MAX;
+    }
+    return new_size;
+}
+
+void swoole_set_object_by_handle(uint32_t handle, void *ptr)
+{
+    assert(handle < SWOOLE_OBJECT_MAX);
+
+    if (sw_unlikely(handle >= swoole_objects.size))
+    {
+        uint32_t old_size = swoole_objects.size;
+        uint32_t new_size = swoole_get_new_size(old_size, handle);
+
+        void *old_ptr = swoole_objects.array;
+        void *new_ptr = NULL;
+
+        new_ptr = sw_realloc(old_ptr, sizeof(void*) * new_size);
+        if (!new_ptr)
+        {
+            php_swoole_fatal_error(E_ERROR, "malloc(%d) failed", (int )(new_size * sizeof(void *)));
+            return;
+        }
+        bzero((char*) new_ptr + (old_size * sizeof(void*)), (new_size - old_size) * sizeof(void*));
+        swoole_objects.array = (void**) new_ptr;
+        swoole_objects.size = new_size;
+    }
+#ifdef ZEND_DEBUG
+    else if (ptr)
+    {
+        assert(swoole_objects.array[handle] == NULL);
+    }
+#endif
+    swoole_objects.array[handle] = ptr;
+}
+
+void swoole_set_property_by_handle(uint32_t handle, int property_id, void *ptr)
+{
+    assert(handle < SWOOLE_OBJECT_MAX);
+
+    if (sw_unlikely(handle >= swoole_objects.property_size[property_id]))
+    {
+        uint32_t old_size = swoole_objects.property_size[property_id];
+        uint32_t new_size = 0;
+
+        void **old_ptr = NULL;
+        void **new_ptr = NULL;
+
+        if (old_size == 0)
+        {
+            new_size = handle < SWOOLE_OBJECT_DEFAULT ? SWOOLE_OBJECT_DEFAULT : swoole_get_new_size(SWOOLE_OBJECT_DEFAULT, handle);
+            new_ptr = (void **) sw_calloc(new_size, sizeof(void *));
+        }
+        else
+        {
+            new_size = swoole_get_new_size(old_size, handle);
+            old_ptr = swoole_objects.property[property_id];
+            new_ptr = (void **) sw_realloc(old_ptr, new_size * sizeof(void *));
+        }
+        if (new_ptr == NULL)
+        {
+            php_swoole_fatal_error(E_ERROR, "malloc(%d) failed", (int )(new_size * sizeof(void *)));
+            return;
+        }
+        if (old_size > 0)
+        {
+            bzero((char *) new_ptr + old_size * sizeof(void*), (new_size - old_size) * sizeof(void*));
+        }
+        swoole_objects.property_size[property_id] = new_size;
+        swoole_objects.property[property_id] = new_ptr;
+    }
+#ifdef ZEND_DEBUG
+    else if (ptr)
+    {
+        assert(swoole_objects.property[property_id][handle] == NULL);
+    }
+#endif
+    swoole_objects.property[property_id][handle] = ptr;
+}
+
 static void php_swoole_file_request_free(void *data)
 {
     file_request *file_req = (file_request *) data;
@@ -266,6 +362,14 @@ void swoole_async_init(int module_number)
     SW_SET_CLASS_SERIALIZABLE(swoole_async, zend_class_serialize_deny, zend_class_unserialize_deny);
     SW_SET_CLASS_CLONEABLE(swoole_async, sw_zend_class_clone_deny);
     SW_SET_CLASS_UNSET_PROPERTY_HANDLER(swoole_async, sw_zend_class_unset_property_deny);
+
+    swoole_objects.size = SWOOLE_OBJECT_DEFAULT;
+    swoole_objects.array = (void**) sw_calloc(swoole_objects.size, sizeof(void*));
+    if (!swoole_objects.array)
+    {
+        php_swoole_fatal_error(E_ERROR, "malloc([swoole_objects]) failed");
+        exit(253);
+    }
 }
 
 static void php_swoole_dns_callback(char *domain, swDNSResolver_result *result, void *data)
