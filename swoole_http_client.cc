@@ -256,7 +256,7 @@ ZEND_END_ARG_INFO()
 ZEND_BEGIN_ARG_INFO_EX(arginfo_swoole_http_client_push, 0, 0, 1)
     ZEND_ARG_INFO(0, data)
     ZEND_ARG_INFO(0, opcode)
-    ZEND_ARG_INFO(0, finish)
+    ZEND_ARG_INFO(0, flags)
 ZEND_END_ARG_INFO()
 
 ZEND_BEGIN_ARG_INFO_EX(arginfo_swoole_http_client_on, 0, 0, 2)
@@ -2205,13 +2205,21 @@ static PHP_METHOD(swoole_http_client, upgrade)
 
 static PHP_METHOD(swoole_http_client, push)
 {
-    zval *zdata = NULL;
+    zval *zdata;
     zend_long opcode = WEBSOCKET_OPCODE_TEXT;
-    zend_bool fin = 1;
+    zval *zflags = NULL;
+    zend_long flags = SW_WEBSOCKET_FLAG_FIN;
 
-    if (zend_parse_parameters(ZEND_NUM_ARGS(), "z|lb", &zdata, &opcode, &fin) == FAILURE)
+    ZEND_PARSE_PARAMETERS_START(1, 3)
+        Z_PARAM_ZVAL(zdata)
+        Z_PARAM_OPTIONAL
+        Z_PARAM_LONG(opcode)
+        Z_PARAM_ZVAL_EX(zflags, 1, 0)
+    ZEND_PARSE_PARAMETERS_END_EX(RETURN_FALSE);
+
+    if (zflags != NULL)
     {
-        RETURN_FALSE;
+        flags = zval_get_long(zflags);
     }
 
     if (sw_unlikely(opcode > SW_WEBSOCKET_OPCODE_MAX))
@@ -2240,8 +2248,7 @@ static PHP_METHOD(swoole_http_client, push)
     }
 
     swString_clear(http_client_buffer);
-    uint8_t flags = swWebSocket_set_flags(fin, http->websocket_mask, 0, 0, 0);
-    if (php_swoole_websocket_frame_pack(http_client_buffer, zdata, opcode, flags) < 0)
+    if (php_swoole_websocket_frame_pack(http_client_buffer, zdata, opcode, flags & SW_WEBSOCKET_FLAGS_ALL, http->websocket_mask, 0) < 0)
     {
         RETURN_FALSE;
     }
