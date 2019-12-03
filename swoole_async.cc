@@ -1705,6 +1705,17 @@ PHP_MINIT_FUNCTION(swoole_async)
 //    ZEND_INIT_MODULE_GLOBALS(swoole, php_swoole_async_init_globals, NULL);
 //    REGISTER_INI_ENTRIES();
 
+    if (PHP_SWOOLE_EXT_ASYNC_VERSION_ID != swoole_version_id())
+    {
+        php_swoole_fatal_error(
+            E_CORE_ERROR,
+            "Ext version (%d) does not match the Swoole version (%d)",
+            swoole_version_id(),
+            PHP_SWOOLE_EXT_ASYNC_VERSION_ID
+        );
+        return FAILURE;
+    }
+
     swoole_http_client_init(module_number);
     swoole_async_init(module_number);
     php_swoole_async_client_minit(module_number);
