@@ -28,6 +28,12 @@
 #include "ext/swoole/include/client.h"
 #include "ext/swoole/include/swoole_api.h"
 
+#define PHP_SWOOLE_EXT_ASYNC_VERSION_ID  40413
+
+#if PHP_SWOOLE_EXT_ASYNC_VERSION_ID != SWOOLE_VERSION_ID
+#error "Ext version does not match the Swoole version"
+#endif
+
 #ifndef SW_MYSQL_CONNECT_TIMEOUT
 #define SW_MYSQL_CONNECT_TIMEOUT         1.0
 #define SW_REDIS_CONNECT_TIMEOUT         1.0
