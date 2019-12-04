@@ -240,7 +240,7 @@ zend_module_entry swoole_async_module_entry =
     PHP_RINIT(swoole_async),
     PHP_RSHUTDOWN(swoole_async),
     PHP_MINFO(swoole_async),
-    PHP_SWOOLE_VERSION,
+    PHP_SWOOLE_EXT_ASYNC_VERSION,
     STANDARD_MODULE_PROPERTIES
 };
 
