@@ -120,8 +120,12 @@ static sw_inline void* swoole_get_property(zval *zobject, int property_id)
     return swoole_get_property_by_handle(Z_OBJ_HANDLE_P(zobject), property_id);
 }
 
+BEGIN_EXTERN_C()
+
 void swoole_set_object_by_handle(uint32_t handle, void *ptr);
 void swoole_set_property_by_handle(uint32_t handle, int property_id, void *ptr);
+
+END_EXTERN_C()
 
 static sw_inline void swoole_set_object(zval *zobject, void *ptr)
 {
