@@ -374,7 +374,6 @@ typedef struct _mysql_client
     swClient *cli;
     zval *object;
     zval *callback;
-    int fd;
     uint32_t transaction :1;
     uint32_t connected :1;
     uint32_t closing :1;

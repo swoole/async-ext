@@ -25,6 +25,7 @@
 typedef struct
 {
     redisAsyncContext *context;
+    swSocket *socket;
     uint8_t state;
     uint8_t connected;
     uint8_t subscribe;
@@ -373,9 +374,17 @@ static PHP_METHOD(swoole_redis, connect)
     zend_update_property_string(swoole_redis_ce, ZEND_THIS, ZEND_STRL("host"), host);
     zend_update_property_long(swoole_redis_ce, ZEND_THIS, ZEND_STRL("port"), port);
 
-    if (sw_reactor()->add(sw_reactor(), redis->context->c.fd, PHP_SWOOLE_FD_REDIS | SW_EVENT_WRITE) < 0)
+    swSocket *conn = swSocket_new(redis->context->c.fd, PHP_SWOOLE_FD_REDIS);
+    if (conn == NULL)
+    {
+        redisAsyncFree(context);
+        RETURN_FALSE;
+    }
+
+    if (sw_reactor()->add(sw_reactor(), conn, SW_EVENT_WRITE) < 0)
     {
         php_swoole_fatal_error(E_WARNING, "swoole_event_add failed. Erorr: %s[%d].", redis->context->errstr, redis->context->err);
+        redisAsyncFree(context);
         RETURN_FALSE;
     }
 
@@ -384,9 +393,8 @@ static PHP_METHOD(swoole_redis, connect)
         redis->timer = swoole_timer_add((long) (redis->timeout * 1000), 0, swoole_redis_onTimeout, redis);
     }
 
+    redis->socket = conn;
     Z_TRY_ADDREF_P(redis->object);
-
-    swSocket *conn = swReactor_get(sw_reactor(), redis->context->c.fd);
     conn->object = redis;
 }
 
@@ -396,6 +404,12 @@ static void redis_close(void* data)
     if (redis->context)
     {
         redisAsyncDisconnect(redis->context);
+    }
+    if (redis->socket)
+    {
+        redis->socket->fd = -1;
+        swSocket_free(redis->socket);
+        redis->socket = NULL;
     }
 }
 
@@ -841,6 +855,9 @@ void swoole_redis_onConnect(const redisAsyncContext *c, int status)
         redis->state = SWOOLE_REDIS_STATE_CLOSED;
         redis_execute_connect_callback(redis, 0);
         sw_reactor()->defer(sw_reactor(), redis_free_object, redis->object);
+        redis->socket->fd = -1;
+        swSocket_free(redis->socket);
+        redis->socket = NULL;
         return;
     }
     else
@@ -934,7 +951,7 @@ static void swoole_redis_event_AddRead(void *privdata)
     swRedisClient *redis = (swRedisClient*) privdata;
     if (redis->context && sw_reactor())
     {
-        swReactor_add_event(sw_reactor(), redis->context->c.fd, SW_EVENT_READ);
+        swReactor_add_event(sw_reactor(), redis->socket, SW_EVENT_READ);
     }
 }
 
@@ -943,7 +960,7 @@ static void swoole_redis_event_DelRead(void *privdata)
     swRedisClient *redis = (swRedisClient*) privdata;
     if (redis->context && sw_reactor())
     {
-        swReactor_del_event(sw_reactor(), redis->context->c.fd, SW_EVENT_READ);
+        swReactor_del_event(sw_reactor(), redis->socket, SW_EVENT_READ);
     }
 }
 
@@ -952,7 +969,7 @@ static void swoole_redis_event_AddWrite(void *privdata)
     swRedisClient *redis = (swRedisClient*) privdata;
     if (redis->context && sw_reactor())
     {
-        swReactor_add_event(sw_reactor(), redis->context->c.fd, SW_EVENT_WRITE);
+        swReactor_add_event(sw_reactor(), redis->socket, SW_EVENT_WRITE);
     }
 }
 
@@ -961,7 +978,7 @@ static void swoole_redis_event_DelWrite(void *privdata)
     swRedisClient *redis = (swRedisClient*) privdata;
     if (redis->context && sw_reactor())
     {
-        swReactor_del_event(sw_reactor(), redis->context->c.fd, SW_EVENT_WRITE);
+        swReactor_del_event(sw_reactor(), redis->socket, SW_EVENT_WRITE);
     }
 }
 
@@ -971,7 +988,7 @@ static void swoole_redis_event_Cleanup(void *privdata)
     redis->state = SWOOLE_REDIS_STATE_CLOSED;
     if (redis->context && sw_reactor())
     {
-        sw_reactor()->del(sw_reactor(), redis->context->c.fd);
+        sw_reactor()->del(sw_reactor(), redis->socket);
     }
 }
 

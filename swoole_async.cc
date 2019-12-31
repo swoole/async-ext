@@ -52,7 +52,7 @@ typedef struct
 {
     zval *callback;
     pid_t pid;
-    int fd;
+    swSocket *socket;
     swString *buffer;
 } process_stream;
 
@@ -1338,7 +1338,7 @@ static int swDNSResolver_onReceive(swReactor *reactor, swEvent *event)
 
     if (swHashMap_count(request_map) == 0)
     {
-        sw_reactor()->del(sw_reactor(), resolver_socket->socket->fd);
+        sw_reactor()->del(sw_reactor(), resolver_socket->socket);
     }
 
     return SW_OK;
@@ -1469,9 +1469,9 @@ static int swDNSResolver_request(char *domain, void (*callback)(char *, swDNSRes
         swReactor_set_handler(sw_reactor(), SW_FD_DNS_RESOLVER, swDNSResolver_onReceive);
     }
 
-    if (!swReactor_exists(sw_reactor(), resolver_socket->socket->fd))
+    if (!swReactor_exists(sw_reactor(), resolver_socket->socket))
     {
-        if (sw_reactor()->add(sw_reactor(), resolver_socket->socket->fd, SW_FD_DNS_RESOLVER) < 0)
+        if (sw_reactor()->add(sw_reactor(), resolver_socket->socket, SW_FD_DNS_RESOLVER) < 0)
         {
             goto _do_close;
         }
@@ -1596,7 +1596,7 @@ static int process_stream_onRead(swReactor *reactor, swEvent *event)
     zval *retval = NULL;
     zval args[2];
 
-    sw_reactor()->del(sw_reactor(), ps->fd);
+    sw_reactor()->del(sw_reactor(), event->socket);
 
     if (ps->buffer->length == 0)
     {
@@ -1638,7 +1638,7 @@ static int process_stream_onRead(swReactor *reactor, swEvent *event)
     }
     zval_ptr_dtor(&args[0]);
     zval_ptr_dtor(&args[1]);
-    close(ps->fd);
+    swSocket_free(ps->socket);
     efree(ps);
 
     return SW_OK;
@@ -1676,15 +1676,16 @@ PHP_METHOD(swoole_async, exec)
         RETURN_FALSE;
     }
 
-    process_stream *ps = ( process_stream *) emalloc(sizeof(process_stream));
+    process_stream *ps = (process_stream *) emalloc(sizeof(process_stream));
     ps->callback = sw_zval_dup(callback);
     Z_TRY_ADDREF_P(ps->callback);
 
-    ps->fd = fd;
     ps->pid = pid;
     ps->buffer = buffer;
+    ps->socket = swSocket_new(fd, (enum swFd_type) PHP_SWOOLE_FD_PROCESS_STREAM);
+    ps->socket->object = ps;
 
-    if (sw_reactor()->add(sw_reactor(), ps->fd, PHP_SWOOLE_FD_PROCESS_STREAM | SW_EVENT_READ) < 0)
+    if (sw_reactor()->add(sw_reactor(), ps->socket, SW_EVENT_READ) < 0)
     {
         sw_zval_free(ps->callback);
         efree(ps);
@@ -1692,8 +1693,6 @@ PHP_METHOD(swoole_async, exec)
     }
     else
     {
-        swSocket *_socket = swReactor_get(sw_reactor(), ps->fd);
-        _socket->object = ps;
         RETURN_LONG(pid);
     }
 }

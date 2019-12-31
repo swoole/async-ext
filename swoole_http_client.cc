@@ -506,7 +506,6 @@ static int http_client_execute(zval *zobject, char *uri, size_t uri_len, zval *c
 
     cli->open_eof_check = 0;
     cli->open_length_check = 0;
-    cli->reactor_fdtype = PHP_SWOOLE_FD_STREAM_CLIENT;
     cli->onReceive = http_client_onReceive;
     cli->onConnect = http_client_onConnect;
     cli->onClose = http_client_onClose;

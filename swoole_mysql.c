@@ -2352,7 +2352,7 @@ static int mysql_query(zval *zobject, mysql_client *client, swString *sql, zval 
     if (!client->cli)
     {
         SwooleG.error = SW_ERROR_CLIENT_NO_CONNECTION;
-        php_swoole_fatal_error(E_WARNING, "mysql connection#%d is closed.", client->fd);
+        php_swoole_fatal_error(E_WARNING, "mysql connection#%d is closed.", client->cli->socket->fd);
         return SW_ERR;
     }
     if (!client->connected)
@@ -2379,7 +2379,7 @@ static int mysql_query(zval *zobject, mysql_client *client, swString *sql, zval 
         return SW_ERR;
     }
     //send query
-    if (sw_reactor()->write(sw_reactor(), client->fd, mysql_request_buffer->str, mysql_request_buffer->length) < 0)
+    if (sw_reactor()->write(sw_reactor(), client->cli->socket, mysql_request_buffer->str, mysql_request_buffer->length) < 0)
     {
         //connection is closed
         if (swConnection_error(errno) == SW_CLOSE)
@@ -2605,12 +2605,11 @@ static PHP_METHOD(swoole_mysql, connect)
 
     zend_update_property(swoole_mysql_ce, ZEND_THIS, ZEND_STRL("onConnect"), callback);
     zend_update_property(swoole_mysql_ce, ZEND_THIS, ZEND_STRL("serverInfo"), server_info);
-    zend_update_property_long(swoole_mysql_ce, ZEND_THIS, ZEND_STRL("sock"), cli->socket->fd);
+    zend_update_property_long(swoole_mysql_ce, ZEND_THIS, ZEND_STRL("sock"), client->cli->socket->fd);
 
     client->cli = cli;
     cli->object = client;
 
-    client->fd = cli->socket->fd;
     client->object = ZEND_THIS;
     sw_copy_to_stack(client->object, client->_object);
     Z_TRY_ADDREF_P(client->object);
@@ -2828,7 +2827,7 @@ static PHP_METHOD(swoole_mysql, close)
     }
     if (client->closing)
     {
-        swoole_error_log(SW_LOG_NOTICE, SW_ERROR_SESSION_CLOSING, "The mysql connection[%d] is closing.", client->fd);
+        swoole_error_log(SW_LOG_NOTICE, SW_ERROR_SESSION_CLOSING, "The mysql connection[%d] is closing.", client->cli->socket->fd);
         RETURN_FALSE;
     }
     swClient *cli = client->cli;
@@ -3219,7 +3218,7 @@ static PHP_METHOD(swoole_mysql, escape)
     }
     if (!client->cli)
     {
-        php_swoole_fatal_error(E_WARNING, "mysql connection#%d is closed.", client->fd);
+        php_swoole_fatal_error(E_WARNING, "mysql connection#%d is closed.", client->cli->socket->fd);
         RETURN_FALSE;
     }
 

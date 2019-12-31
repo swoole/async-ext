@@ -587,7 +587,6 @@ static PHP_METHOD(swoole_async_client, connect)
         cli->onClose = client_onClose;
         cli->onError = client_onError;
         cli->onReceive = client_onReceive;
-        cli->reactor_fdtype = PHP_SWOOLE_FD_STREAM_CLIENT;
         if (cb->cache_onBufferFull.function_handler)
         {
             cli->onBufferFull = client_onBufferFull;
@@ -612,7 +611,6 @@ static PHP_METHOD(swoole_async_client, connect)
             cli->onError = client_onError;
         }
         cli->onReceive = client_onReceive;
-        cli->reactor_fdtype = PHP_SWOOLE_FD_DGRAM_CLIENT;
     }
 
     zval *zobject = ZEND_THIS;
@@ -1084,7 +1082,7 @@ static PHP_METHOD(swoole_async_client, enableSSL)
     cli->ssl_wait_handshake = 1;
     cli->socket->ssl_state = SW_SSL_STATE_WAIT_STREAM;
 
-    swoole_event_set(cli->socket->fd, SW_EVENT_WRITE, SW_FD_STREAM_CLIENT);
+    swoole_event_set(cli->socket, SW_EVENT_WRITE);
 
     RETURN_TRUE;
 }
