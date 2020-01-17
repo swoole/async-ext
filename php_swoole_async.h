@@ -147,13 +147,14 @@ PHP_MINFO_FUNCTION(swoole_async);
 
 void php_swoole_async_client_minit(int module_number);
 void swoole_http_client_init(int module_number);
-void swoole_redis_init(int module_number);
-void swoole_mysql_init(int module_number);
-void swoole_mmap_init(int module_number);
+void php_swoole_buffer_minit(int module_number);
 void swoole_channel_init(int module_number);
-void swoole_ringqueue_init(int module_number);
-void swoole_msgqueue_init(int module_number);
 void swoole_memory_pool_init(int module_number);
+void swoole_mmap_init(int module_number);
+void swoole_msgqueue_init(int module_number);
+void swoole_mysql_init(int module_number);
+void swoole_redis_init(int module_number);
+void swoole_ringqueue_init(int module_number);
 
 END_EXTERN_C()
 
