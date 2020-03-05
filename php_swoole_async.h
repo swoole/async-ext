@@ -28,8 +28,8 @@
 #include "ext/swoole/include/client.h"
 #include "ext/swoole/include/swoole_api.h"
 
-#define PHP_SWOOLE_EXT_ASYNC_VERSION     "4.4.15"
-#define PHP_SWOOLE_EXT_ASYNC_VERSION_ID  40415
+#define PHP_SWOOLE_EXT_ASYNC_VERSION     "4.4.16"
+#define PHP_SWOOLE_EXT_ASYNC_VERSION_ID  40416
 
 #if PHP_SWOOLE_EXT_ASYNC_VERSION_ID != SWOOLE_VERSION_ID
 #error "Ext version does not match the Swoole version"
