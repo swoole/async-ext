@@ -16,6 +16,7 @@
 
 #include "php_swoole_async.h"
 #include "ext/swoole/php_swoole_cxx.h"
+#include "ext/swoole/swoole_client.h"
 #include "socks5.h"
 #include "mqtt.h"
 

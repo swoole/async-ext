@@ -380,7 +380,6 @@ typedef struct _mysql_client
 
     mysql_connector connector;
     mysql_statement *statement;
-    swLinkedList *statement_list;
 
     swTimer_node *timer;
 

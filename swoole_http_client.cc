@@ -16,8 +16,9 @@
 */
 
 #include "php_swoole_async.h"
+#include "ext/swoole/swoole_client.h"
 #include "swoole_http_client_async.h"
-#include "mime_types.h"
+#include "mime_type.h"
 
 #ifndef SW_HTTP_CLIENT_BOUNDARY_TOTAL_SIZE
 #define SW_HTTP_CLIENT_BOUNDARY_TOTAL_SIZE   39
@@ -1634,7 +1635,7 @@ static PHP_METHOD(swoole_http_client, addFile)
     }
     if (l_type == 0)
     {
-        type = (char*) swoole_mime_type_get(path);
+        type = (char*) swoole::mime_type::get(path).c_str();
         l_type = strlen(type);
     }
     if (l_filename == 0)
