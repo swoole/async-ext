@@ -1715,16 +1715,17 @@ PHP_MINIT_FUNCTION(swoole_async)
         return FAILURE;
     }
 
-    swoole_http_client_init(module_number);
     swoole_async_init(module_number);
     php_swoole_async_client_minit(module_number);
-    swoole_mysql_init(module_number);
-    swoole_mmap_init(module_number);
+    php_swoole_buffer_minit(module_number);
     swoole_channel_init(module_number);
+    swoole_http_client_init(module_number);
+    swoole_memory_pool_init(module_number);
+    swoole_mmap_init(module_number);
+    swoole_msgqueue_init(module_number);
+    swoole_mysql_init(module_number);
     swoole_redis_init(module_number);
     swoole_ringqueue_init(module_number);
-    swoole_msgqueue_init(module_number);
-    swoole_memory_pool_init(module_number);
 
     return SUCCESS;
 }
