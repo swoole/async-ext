@@ -401,7 +401,7 @@ static swClient* php_swoole_async_client_new(zval *zobject, char *host, int host
 
     long type = Z_LVAL_P(ztype);
 
-    int client_type = php_swoole_socktype(type);
+    enum swSocket_type client_type = php_swoole_socktype(type);
     if ((client_type == SW_SOCK_TCP || client_type == SW_SOCK_TCP6) && (port <= 0 || port > SW_CLIENT_MAX_PORT))
     {
         php_swoole_fatal_error(E_WARNING, "The port is invalid");
@@ -1101,7 +1101,7 @@ static PHP_METHOD(swoole_async_client, getPeerCert)
         RETURN_FALSE;
     }
     char buf[8192];
-    int n = swSSL_get_client_certificate(cli->socket->ssl, buf, sizeof(buf));
+    int n = swSSL_get_peer_cert(cli->socket->ssl, buf, sizeof(buf));
     if (n < 0)
     {
         RETURN_FALSE;

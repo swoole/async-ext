@@ -59,19 +59,6 @@ typedef struct
     uint8_t error_flag;
     uint8_t shutdown;
 
-#ifdef SW_COROUTINE
-    zend_bool defer; //0 normal 1 wait for receive
-    zend_bool defer_result;//0
-    zend_bool defer_chunk_status;// 0 1 now use rango http->complete
-    zend_bool send_yield;
-    http_client_defer_state defer_status;
-    long cid;
-    /**
-     * for websocket
-     */
-    swLinkedList *message_queue;
-#endif
-
 } http_client_property;
 
 typedef struct
@@ -1746,7 +1733,7 @@ static PHP_METHOD(swoole_http_client, close)
         RETURN_FALSE;
     }
     int ret = SW_OK;
-    if (!cli->keep || swConnection_error(SwooleG.error) == SW_CLOSE)
+    if (!cli->keep || swSocket_error(SwooleG.error) == SW_CLOSE)
     {
         ret = cli->close(cli);
     }
