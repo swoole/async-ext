@@ -2382,7 +2382,7 @@ static int mysql_query(zval *zobject, mysql_client *client, swString *sql, zval 
     if (sw_reactor()->write(sw_reactor(), client->cli->socket, mysql_request_buffer->str, mysql_request_buffer->length) < 0)
     {
         //connection is closed
-        if (swConnection_error(errno) == SW_CLOSE)
+        if (swSocket_error(errno) == SW_CLOSE)
         {
             zend_update_property_bool(swoole_mysql_ce, zobject, ZEND_STRL("connected"), 0);
             zend_update_property_long(swoole_mysql_ce, zobject, ZEND_STRL("errno"), 2013);
