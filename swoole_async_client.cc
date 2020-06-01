@@ -79,7 +79,7 @@ static swClient* php_swoole_async_client_new(zval *zobject, char *host, int host
 static void php_swoole_async_client_free(zval *zobject, swClient *cli);
 
 static void client_onConnect(swClient *cli);
-static void client_onReceive(swClient *cli, char *data, uint32_t length);
+static void client_onReceive(swClient *cli, const char *data, uint32_t length);
 static void client_onClose(swClient *cli);
 static void client_onError(swClient *cli);
 static void client_onBufferFull(swClient *cli);
@@ -272,7 +272,7 @@ void php_swoole_async_client_minit(int module_number)
     zend_declare_class_constant_long(swoole_async_client_ce, ZEND_STRL("SHUT_WR"), SHUT_WR);
 }
 
-static void client_onReceive(swClient *cli, char *data, uint32_t length)
+static void client_onReceive(swClient *cli, const char *data, uint32_t length)
 {
     zval *zobject = (zval *) cli->object;
     zend_fcall_info_cache *fci_cache = &((client_callback *) swoole_get_property(zobject, 0))->cache_onReceive;

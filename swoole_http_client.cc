@@ -112,13 +112,13 @@ typedef struct
 
 swString *http_client_buffer;
 
-static void http_client_onReceive(swClient *cli, char *data, uint32_t length);
+static void http_client_onReceive(swClient *cli, const char *data, uint32_t length);
 static void http_client_onConnect(swClient *cli);
 static void http_client_onClose(swClient *cli);
 static void http_client_onError(swClient *cli);
 static void http_client_onRequestTimeout(swTimer *timer, swTimer_node *tnode);
 static void http_client_onResponseException(zval *zobject);
-static int http_client_onMessage(swProtocol *proto, swConnection *conn, char *data, uint32_t length);
+static int http_client_onMessage(swProtocol *proto, swConnection *conn, const char *data, uint32_t length);
 
 static int http_client_send_http_request(zval *zobject);
 static int http_client_execute(zval *zobject, char *uri, size_t uri_len, zval *callback);
@@ -634,7 +634,7 @@ static void http_client_onClose(swClient *cli)
     zval_ptr_dtor(zobject);
 }
 
-static int http_client_onMessage(swProtocol *proto, swSocket *socket, char *data, uint32_t length)
+static int http_client_onMessage(swProtocol *proto, swSocket *socket, const char *data, uint32_t length)
 {
     swClient *cli = (swClient *) socket->object;
     zval *zobject = (zval *) cli->object;
@@ -739,7 +739,7 @@ static void http_client_onResponseException(zval *zobject)
     }
 }
 
-static void http_client_onReceive(swClient *cli, char *data, uint32_t length)
+static void http_client_onReceive(swClient *cli, const char *data, uint32_t length)
 {
     zval *zobject = (zval *) cli->object;
     http_client *http = (http_client *) swoole_get_object(zobject);
