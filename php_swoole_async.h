@@ -31,7 +31,7 @@
 #define PHP_SWOOLE_EXT_ASYNC_VERSION     "4.5.3"
 #define PHP_SWOOLE_EXT_ASYNC_VERSION_ID  40503
 
-#if SWOOLE_API_VERSION_ID != 0x202003a || SWOOLE_VERSION_ID < 40503
+#if SWOOLE_API_VERSION_ID < 0x202006a || SWOOLE_VERSION_ID < 40503
 #error "Ext version does not match the Swoole version"
 #endif
 

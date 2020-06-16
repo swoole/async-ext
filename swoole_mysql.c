@@ -406,11 +406,11 @@ static void mysql_columns_free(mysql_client *client)
 
 static void mysql_client_onError(swClient *cli);
 static void mysql_client_onConnect(swClient *cli);
-static void mysql_client_onReceive(swClient *cli, char *data, uint32_t length);
+static void mysql_client_onReceive(swClient *cli, const char *data, uint32_t length);
 static void mysql_client_onClose(swClient *cli);
 
-static int swoole_mysql_onHandShake(mysql_client *client, char *data, ssize_t n);
-static int swoole_mysql_onResponse(mysql_client *client, char *data, ssize_t n);
+static int swoole_mysql_onHandShake(mysql_client *client, const char *data, ssize_t n);
+static int swoole_mysql_onResponse(mysql_client *client, const char *data, ssize_t n);
 static void swoole_mysql_onConnect(mysql_client *client);
 
 void swoole_mysql_init(int module_number)
@@ -2921,7 +2921,7 @@ static void mysql_client_onClose(swClient *cli)
     zval_ptr_dtor(client->object);
 }
 
-static void mysql_client_onReceive(swClient *cli, char *data, uint32_t length)
+static void mysql_client_onReceive(swClient *cli, const char *data, uint32_t length)
 {
     mysql_client *client = (mysql_client *) cli->object;
     swString *buffer = cli->buffer;
@@ -2985,7 +2985,7 @@ static void swoole_mysql_onConnect(mysql_client *client)
     }
 }
 
-static int swoole_mysql_onResponse(mysql_client *client, char *data, ssize_t n)
+static int swoole_mysql_onResponse(mysql_client *client, const char *data, ssize_t n)
 {
     zval *zobject = client->object;
 
@@ -3050,7 +3050,7 @@ static int swoole_mysql_onResponse(mysql_client *client, char *data, ssize_t n)
     return SW_OK;
 }
 
-static int swoole_mysql_onHandShake(mysql_client *client, char *data, ssize_t n)
+static int swoole_mysql_onHandShake(mysql_client *client, const char *data, ssize_t n)
 {
     swClient *cli = client->cli;
     mysql_connector *connector = &client->connector;
