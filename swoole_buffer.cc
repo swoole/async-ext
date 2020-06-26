@@ -144,7 +144,7 @@ static void swoole_buffer_recycle(swString *buffer)
     {
         return;
     }
-    swString_pop_front(buffer, buffer->offset);
+    swString_reduce(buffer, buffer->offset);
 }
 
 static PHP_METHOD(swoole_buffer, __construct)
