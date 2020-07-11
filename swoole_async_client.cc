@@ -17,7 +17,7 @@
 #include "php_swoole_async.h"
 #include "ext/swoole/php_swoole_cxx.h"
 #include "ext/swoole/swoole_client.h"
-#include "socks5.h"
+#include "ext/swoole/include/proxy.h"
 #include "mqtt.h"
 
 #include <string>
@@ -146,8 +146,8 @@ static sw_inline swClient* client_get_ptr(zval *zobject)
     }
     else
     {
-        SwooleG.error = SW_ERROR_CLIENT_NO_CONNECTION;
-        zend_update_property_long(swoole_async_client_ce, zobject, ZEND_STRL("errCode"), SwooleG.error);
+        swoole_set_last_error(SW_ERROR_CLIENT_NO_CONNECTION);
+        zend_update_property_long(swoole_async_client_ce, zobject, ZEND_STRL("errCode"), SW_ERROR_CLIENT_NO_CONNECTION);
         php_swoole_error(E_WARNING, "client is not connected to server");
         return NULL;
     }
@@ -315,7 +315,7 @@ static void client_onClose(swClient *cli)
 static void client_onError(swClient *cli)
 {
     zval *zobject = (zval *) cli->object;
-    zend_update_property_long(swoole_async_client_ce, zobject, ZEND_STRL("errCode"), SwooleG.error);
+    zend_update_property_long(swoole_async_client_ce, zobject, ZEND_STRL("errCode"), swoole_get_last_error());
     php_swoole_async_client_free(zobject, cli);
     client_execute_callback(zobject, SW_CLIENT_CB_onError);
     zval_ptr_dtor(zobject);
@@ -405,7 +405,7 @@ static swClient* php_swoole_async_client_new(zval *zobject, char *host, int host
     if ((client_type == SW_SOCK_TCP || client_type == SW_SOCK_TCP6) && (port <= 0 || port > SW_CLIENT_MAX_PORT))
     {
         php_swoole_fatal_error(E_WARNING, "The port is invalid");
-        SwooleG.error = SW_ERROR_INVALID_PARAMS;
+        swoole_set_last_error(SW_ERROR_INVALID_PARAMS);
         return NULL;
     }
 
@@ -619,26 +619,20 @@ static PHP_METHOD(swoole_async_client, connect)
     sw_copy_to_stack(cli->object, cb->_object);
     Z_TRY_ADDREF_P(zobject);
 
-    if (cli->connect(cli, host, port, timeout, sock_flag) < 0)
-    {
-        if (errno == 0)
-        {
-            if (SwooleG.error == SW_ERROR_DNSLOOKUP_RESOLVE_FAILED)
-            {
+    if (cli->connect(cli, host, port, timeout, sock_flag) < 0) {
+        if (errno == 0) {
+            if (swoole_get_last_error() == SW_ERROR_DNSLOOKUP_RESOLVE_FAILED) {
                 php_swoole_error(E_WARNING, "connect to server[%s:%d] failed. Error: %s[%d]", host, (int ) port,
-                        swoole_strerror(SwooleG.error), SwooleG.error);
+                                 swoole_strerror(swoole_get_last_error()), swoole_get_last_error());
             }
-            zend_update_property_long(swoole_async_client_ce, ZEND_THIS, ZEND_STRL("errCode"), SwooleG.error);
-        }
-        else
-        {
+            zend_update_property_long(swoole_async_client_ce, ZEND_THIS, ZEND_STRL("errCode"), swoole_get_last_error());
+        } else {
             php_swoole_sys_error(E_WARNING, "connect to server[%s:%d] failed", host, (int )port);
             zend_update_property_long(swoole_async_client_ce, ZEND_THIS, ZEND_STRL("errCode"), errno);
         }
 
         swClient *cli = (swClient *) swoole_get_object(ZEND_THIS);
-        if (cli && cli->onError == NULL)
-        {
+        if (cli && cli->onError == NULL) {
             php_swoole_async_client_free(ZEND_THIS, cli);
             zval_ptr_dtor(ZEND_THIS);
         }
@@ -673,12 +667,12 @@ static PHP_METHOD(swoole_async_client, send)
     }
 
     //clear errno
-    SwooleG.error = 0;
+    swoole_set_last_error(0);
     int ret = cli->send(cli, data, data_len, flags);
     if (ret < 0)
     {
         php_swoole_sys_error(E_WARNING, "failed to send(%d) %zu bytes", cli->socket->fd, data_len);
-        zend_update_property_long(swoole_async_client_ce, ZEND_THIS, ZEND_STRL("errCode"), SwooleG.error);
+        zend_update_property_long(swoole_async_client_ce, ZEND_THIS, ZEND_STRL("errCode"), swoole_get_last_error());
         RETVAL_FALSE;
     }
     else
@@ -768,13 +762,13 @@ static PHP_METHOD(swoole_async_client, sendfile)
         RETURN_FALSE;
     }
     //clear errno
-    SwooleG.error = 0;
+    swoole_set_last_error(0);
     int ret = cli->sendfile(cli, file, offset, length);
     if (ret < 0)
     {
-        SwooleG.error = errno;
-        php_swoole_fatal_error(E_WARNING, "sendfile() failed. Error: %s [%d]", strerror(SwooleG.error), SwooleG.error);
-        zend_update_property_long(swoole_async_client_ce, ZEND_THIS, ZEND_STRL("errCode"), SwooleG.error);
+        swoole_set_last_error(errno);
+        php_swoole_fatal_error(E_WARNING, "sendfile() failed. Error: %s [%d]", strerror(errno), errno);
+        zend_update_property_long(swoole_async_client_ce, ZEND_THIS, ZEND_STRL("errCode"), errno);
         RETVAL_FALSE;
     }
     else

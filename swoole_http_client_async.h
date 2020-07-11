@@ -17,6 +17,9 @@
 #ifndef SWOOLE_HTTP_CLIENT_ASYNC_H_
 #define SWOOLE_HTTP_CLIENT_ASYNC_H_
 
+#include "swoole_http_async.h"
+#include "ext/swoole/include/websocket.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -25,8 +28,6 @@ extern "C" {
 #include "ext/standard/php_http.h"
 #include "ext/standard/base64.h"
 
-#include "swoole_http_async.h"
-#include "websocket.h"
 #include "thirdparty/swoole_http_parser.h"
 
 #ifdef SW_HAVE_ZLIB

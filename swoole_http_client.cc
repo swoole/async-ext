@@ -670,7 +670,7 @@ static int http_client_onMessage(swProtocol *proto, swSocket *socket, const char
 static void http_client_onError(swClient *cli)
 {
     zval *zobject = (zval *) cli->object;
-    zend_update_property_long(swoole_http_client_ce, zobject, ZEND_STRL("errCode"), SwooleG.error);
+    zend_update_property_long(swoole_http_client_ce, zobject, ZEND_STRL("errCode"), swoole_get_last_error());
     http_client_free(zobject);
     http_client_execute_callback(zobject, SW_CLIENT_CB_onError);
     zval_ptr_dtor(zobject);
@@ -900,7 +900,7 @@ static int http_client_send_http_request(zval *zobject)
 
     http->state = HTTP_CLIENT_STATE_BUSY;
      //clear errno
-    SwooleG.error = 0;
+    swoole_set_last_error(0);
 
     http_client_property *hcc = (http_client_property *) swoole_get_property(zobject, 0);
 
@@ -1277,9 +1277,9 @@ static int http_client_send_http_request(zval *zobject)
         if ((ret = http->cli->send(http->cli, http_client_buffer->str, http_client_buffer->length, 0)) < 0)
         {
             send_fail:
-            SwooleG.error = errno;
+            swoole_set_last_error(errno);
             php_swoole_sys_error(E_WARNING, "send(%d) %d bytes failed.", http->cli->socket->fd, (int )http_client_buffer->length);
-            zend_update_property_long(swoole_http_client_ce, zobject, ZEND_STRL("errCode"), SwooleG.error);
+            zend_update_property_long(swoole_http_client_ce, zobject, ZEND_STRL("errCode"), errno);
             return SW_ERR;
         }
     }
@@ -1733,7 +1733,7 @@ static PHP_METHOD(swoole_http_client, close)
         RETURN_FALSE;
     }
     int ret = SW_OK;
-    if (!cli->keep || swSocket_error(SwooleG.error) == SW_CLOSE)
+    if (!cli->keep || swSocket_error(swoole_get_last_error()) == SW_CLOSE)
     {
         ret = cli->close(cli);
     }
@@ -2212,7 +2212,7 @@ static PHP_METHOD(swoole_http_client, push)
     if (sw_unlikely(opcode > SW_WEBSOCKET_OPCODE_MAX))
     {
         php_swoole_fatal_error(E_WARNING, "the maximum value of opcode is %d.", SW_WEBSOCKET_OPCODE_MAX);
-        SwooleG.error = SW_ERROR_WEBSOCKET_BAD_OPCODE;
+        swoole_set_last_error(SW_ERROR_WEBSOCKET_BAD_OPCODE);
         RETURN_FALSE;
     }
 
@@ -2223,13 +2223,13 @@ static PHP_METHOD(swoole_http_client, push)
         if (hcc->error_flag & HTTP_CLIENT_EFLAG_UPGRADE)
         {
             php_swoole_fatal_error(E_WARNING, "websocket handshake failed, cannot push data.");
-            SwooleG.error = SW_ERROR_WEBSOCKET_HANDSHAKE_FAILED;
+            swoole_set_last_error(SW_ERROR_WEBSOCKET_HANDSHAKE_FAILED);
             RETURN_FALSE;
         }
         else
         {
             php_swoole_error(E_WARNING, "not connected to the server");
-            SwooleG.error = SW_ERROR_WEBSOCKET_UNCONNECTED;
+            swoole_set_last_error(SW_ERROR_WEBSOCKET_UNCONNECTED);
             RETURN_FALSE;
         }
     }

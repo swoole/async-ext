@@ -16,12 +16,13 @@
 
 #include "php_swoole_async.h"
 #include "ext/swoole/php_swoole_cxx.h"
+#include "ext/swoole/include/process_pool.h"
 #include "php_streams.h"
 #include "php_network.h"
-
 #include "ext/standard/file.h"
 
 #include <string>
+#include <memory>
 #include <unordered_map>
 
 typedef struct
@@ -87,8 +88,8 @@ enum swDNS_error
 
 typedef struct
 {
-    void (*callback)(char *domain, swDNSResolver_result *result, void *data);
-    char *domain;
+    void (*callback)(const char *domain, swDNSResolver_result *result, void *data);
+    std::string domain;
     void *data;
 } swDNS_lookup_request;
 
@@ -133,7 +134,7 @@ typedef struct rr_flags
 
 static uint16_t swoole_dns_request_id = 1;
 static swClient *resolver_socket = NULL;
-static swHashMap *request_map = NULL;
+static std::unordered_map<std::string, swDNS_lookup_request *> *request_map;
 
 static void aio_onFileCompleted(swAio_event *event);
 static void aio_onDNSCompleted(swAio_event *event);
@@ -372,7 +373,7 @@ void swoole_async_init(int module_number)
     }
 }
 
-static void php_swoole_dns_callback(char *domain, swDNSResolver_result *result, void *data)
+static void php_swoole_dns_callback(const char *domain, swDNSResolver_result *result, void *data)
 {
     dns_request *req = (dns_request *) data;
     zval *retval = NULL;
@@ -440,7 +441,7 @@ static void aio_onDNSCompleted(swAio_event *event)
     ret = event->ret;
     if (ret < 0)
     {
-        SwooleG.error = event->error;
+        swoole_set_last_error(event->error);
         php_swoole_error(E_WARNING, "Aio Error: %s[%d]", strerror(event->error), event->error);
     }
 
@@ -497,7 +498,7 @@ static void aio_onFileCompleted(swAio_event *event)
 
     if (ret < 0)
     {
-        SwooleG.error = event->error;
+        swoole_set_last_error(event->error);
         php_swoole_error(E_WARNING, "Aio Error: %s[%d]", strerror(event->error), event->error);
     }
     else
@@ -661,7 +662,7 @@ PHP_FUNCTION(swoole_async_read)
         buf_size = SW_AIO_MAX_CHUNK_SIZE;
     }
 
-    zend::string str_filename(filename);
+    zend::String str_filename(filename);
     int fd = open(str_filename.val(), open_flag, 0644);
     if (fd < 0)
     {
@@ -763,7 +764,7 @@ PHP_FUNCTION(swoole_async_write)
         }
     }
 
-    zend::string str_filename(filename);
+    zend::String str_filename(filename);
 
     file_request *req = (file_request *) emalloc(sizeof(file_request));
 
@@ -789,9 +790,10 @@ PHP_FUNCTION(swoole_async_write)
     }
     else
     {
-        fd = file_iterator->second.fd;
-        file_iterator->second.refcount++;
-        req->refcount = &file_iterator->second.refcount;
+        open_file &fp = file_iterator->second;
+        fd = fp.fd;
+        fp.refcount++;
+        req->refcount = &fp.refcount;
         swTraceLog(SW_TRACE_AIO, "reuse write file fd#%d", fd);
     }
 
@@ -852,8 +854,7 @@ PHP_FUNCTION(swoole_async_readfile)
         RETURN_FALSE;
     }
 
-    zend::string str_filename(filename);
-
+    zend::String str_filename(filename);
     int fd = open(str_filename.val(), open_flag, 0644);
     if (fd < 0)
     {
@@ -968,7 +969,7 @@ PHP_FUNCTION(swoole_async_writefile)
         }
     }
 
-    zend::string str_filename(filename);
+    zend::String str_filename(filename);
     int fd = open(str_filename.val(), open_flag, 0644);
     if (fd < 0)
     {
@@ -1061,8 +1062,7 @@ PHP_FUNCTION(swoole_async_set)
     }
     if (php_swoole_array_get_value(vht, "log_level", v))
     {
-        zend_long level = zval_get_long(v);
-        SwooleG.log_level = (uint32_t) (level < 0 ? UINT32_MAX : level);
+        sw_logger()->set_level(zval_get_long(v));
     }
     if (php_swoole_array_get_value(vht, "thread_num", v) || php_swoole_array_get_value(vht, "min_thread_num", v))
     {
@@ -1086,7 +1086,7 @@ PHP_FUNCTION(swoole_async_set)
     }
     if (php_swoole_array_get_value(vht, "dns_server", v))
     {
-        zend::string str_v(v);
+        zend::String str_v(v);
         SwooleG.dns_server_v4 = sw_strndup(str_v.val(), str_v.len());
     }
     if (php_swoole_array_get_value(vht, "use_async_resolver", v))
@@ -1103,7 +1103,7 @@ PHP_FUNCTION(swoole_async_set)
  * The function converts the dot-based hostname into the DNS format
  * (i.e. www.apple.com into 3www5apple3com0)
  */
-static int domain_encode(char *src, int n, char *dest)
+static int domain_encode(const char *src, int n, char *dest)
 {
     if (src[n] == '.')
     {
@@ -1296,8 +1296,10 @@ static int swDNSResolver_onReceive(swReactor *reactor, swEvent *event)
     char key[1024];
     int request_id = ntohs(header->id);
     int key_len = sw_snprintf(key, sizeof(key), "%s-%d", _domain_name, request_id);
-    swDNS_lookup_request *request = (swDNS_lookup_request *) swHashMap_find(request_map, key, key_len);
-    if (request == NULL)
+
+    std::string strkey(key, key_len);
+    auto iter = request_map->find(strkey);
+    if (iter == request_map->end())
     {
         swWarn("bad response, request_id=%d", request_id);
         return SW_OK;
@@ -1321,20 +1323,19 @@ static int swDNSResolver_onReceive(swReactor *reactor, swEvent *event)
         }
     }
 
-    request->callback(request->domain, &result, request->data);
-    swHashMap_del(request_map, key, key_len);
-    sw_free(request->domain);
-    sw_free(request);
+    auto request = iter->second;
+    request->callback(request->domain.c_str(), &result, request->data);
+    request_map->erase(iter);
+    delete request;
 
-    if (swHashMap_count(request_map) == 0)
-    {
-        sw_reactor()->del(sw_reactor(), resolver_socket->socket);
+    if (request_map->size() == 0) {
+        swoole_event_del(resolver_socket->socket);
     }
 
     return SW_OK;
 }
 
-static int swDNSResolver_request(char *domain, void (*callback)(char *, swDNSResolver_result *, void *), void *data)
+static int swDNSResolver_request(const char *domain, void (*callback)(const char *, swDNSResolver_result *, void *), void *data)
 {
     char *_domain_name;
     Q_FLAGS *qflags = NULL;
@@ -1380,35 +1381,26 @@ static int swDNSResolver_request(char *domain, void (*callback)(char *, swDNSRes
     int key_len = sw_snprintf(key, sizeof(key), "%s-%d", domain, swoole_dns_request_id);
     if (!request_map)
     {
-        request_map = swHashMap_new(128, NULL);
+        request_map = new std::unordered_map<std::string, swDNS_lookup_request *>();
     }
-    else if (swHashMap_find(request_map, key, key_len))
+
+    std::string strkey(key, key_len);
+    auto iter = request_map->find(strkey);
+    if (iter == request_map->end())
     {
         swoole_error_log(SW_LOG_WARNING, SW_ERROR_DNSLOOKUP_DUPLICATE_REQUEST, "duplicate request");
         return SW_ERR;
     }
 
-    swDNS_lookup_request *request = (swDNS_lookup_request *) sw_malloc(sizeof(swDNS_lookup_request));
-    if (request == NULL)
-    {
-        swWarn("malloc(%d) failed", (int ) sizeof(swDNS_lookup_request));
-        return SW_ERR;
-    }
-    request->domain = sw_strndup(domain, len + 1);
-    if (request->domain == NULL)
-    {
-        swWarn("strdup(%d) failed", len + 1);
-        sw_free(request);
-        return SW_ERR;
-    }
+    swDNS_lookup_request *request = new swDNS_lookup_request;
+    std::unique_ptr<swDNS_lookup_request> ptr(request);
+    request->domain = std::string(domain, len);
     request->data = data;
     request->callback = callback;
 
-    if (domain_encode(request->domain, len, _domain_name) < 0)
+    if (domain_encode(request->domain.c_str(), len, _domain_name) < 0)
     {
         swWarn("invalid domain[%s]", domain);
-        sw_free(request->domain);
-        sw_free(request);
         return SW_ERR;
     }
 
@@ -1424,16 +1416,12 @@ static int swDNSResolver_request(char *domain, void (*callback)(char *, swDNSRes
         resolver_socket = (swClient *) sw_malloc(sizeof(swClient));
         if (resolver_socket == NULL)
         {
-            sw_free(request->domain);
-            sw_free(request);
             swWarn("malloc failed");
             return SW_ERR;
         }
         if (swClient_create(resolver_socket, SW_SOCK_UDP, 0) < 0)
         {
             sw_free(resolver_socket);
-            sw_free(request->domain);
-            sw_free(request);
             return SW_ERR;
         }
         do
@@ -1454,9 +1442,9 @@ static int swDNSResolver_request(char *domain, void (*callback)(char *, swDNSRes
         } while (0);
     }
 
-    if (!swReactor_isset_handler(sw_reactor(), SW_FD_DNS_RESOLVER))
+    if (!swoole_event_isset_handler(SW_FD_DNS_RESOLVER))
     {
-        swReactor_set_handler(sw_reactor(), SW_FD_DNS_RESOLVER, swDNSResolver_onReceive);
+        swoole_event_set_handler(SW_FD_DNS_RESOLVER, swDNSResolver_onReceive);
     }
 
     if (!swReactor_exists(sw_reactor(), resolver_socket->socket))
@@ -1473,14 +1461,14 @@ static int swDNSResolver_request(char *domain, void (*callback)(char *, swDNSRes
         resolver_socket->close(resolver_socket);
         swClient_free(resolver_socket);
         sw_free(resolver_socket);
-        sw_free(request->domain);
-        sw_free(request);
         resolver_socket = NULL;
         return SW_ERR;
     }
 
-    swHashMap_add(request_map, key, key_len, request);
+    request_map->emplace(std::make_pair(strkey, request));
+    ptr.release();
     swoole_dns_request_id++;
+
     return SW_OK;
 }
 
@@ -1646,10 +1634,10 @@ PHP_METHOD(swoole_async, exec)
     }
 
     php_swoole_check_reactor();
-    if (!swReactor_isset_handler(sw_reactor(), PHP_SWOOLE_FD_PROCESS_STREAM))
+    if (!swoole_event_isset_handler(PHP_SWOOLE_FD_PROCESS_STREAM))
     {
-        swReactor_set_handler(sw_reactor(), PHP_SWOOLE_FD_PROCESS_STREAM | SW_EVENT_READ, process_stream_onRead);
-        swReactor_set_handler(sw_reactor(), PHP_SWOOLE_FD_PROCESS_STREAM | SW_EVENT_ERROR, process_stream_onRead);
+        swoole_event_set_handler(PHP_SWOOLE_FD_PROCESS_STREAM | SW_EVENT_READ, process_stream_onRead);
+        swoole_event_set_handler(PHP_SWOOLE_FD_PROCESS_STREAM | SW_EVENT_ERROR, process_stream_onRead);
     }
 
     pid_t pid;

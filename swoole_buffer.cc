@@ -15,6 +15,7 @@
 */
 
 #include "php_swoole.h"
+#include "ext/swoole/include/swoole_string.h"
 
 static zend_class_entry *swoole_buffer_ce;
 static zend_object_handlers swoole_buffer_handlers;

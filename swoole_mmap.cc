@@ -14,7 +14,9 @@
   +----------------------------------------------------------------------+
 */
 
-#include "php_swoole.h"
+#include "ext/swoole/php_swoole.h"
+#include "ext/swoole/include/swoole_memory.h"
+#include <sys/mman.h>
 
 typedef struct
 {
@@ -25,10 +27,10 @@ typedef struct
     void *ptr;
 } swMmapFile;
 
-static size_t mmap_stream_write(php_stream * stream, const char *buffer, size_t length);
-static size_t mmap_stream_read(php_stream *stream, char *buffer, size_t length);
+static ssize_t mmap_stream_write(php_stream * stream, const char *buffer, size_t length);
+static ssize_t mmap_stream_read(php_stream *stream, char *buffer, size_t length);
 static int mmap_stream_flush(php_stream *stream);
-static int mmap_stream_seek(php_stream *stream, off_t offset, int whence, off_t *newoffset);
+static int mmap_stream_seek(php_stream *stream, zend_off_t offset, int whence, zend_off_t *newoffset);
 static int mmap_stream_close(php_stream *stream, int close_handle);
 static PHP_METHOD(swoole_mmap, open);
 
@@ -60,11 +62,11 @@ php_stream_ops mmap_ops =
     NULL
 };
 
-static size_t mmap_stream_write(php_stream * stream, const char *buffer, size_t length)
+static ssize_t mmap_stream_write(php_stream * stream, const char *buffer, size_t length)
 {
-    swMmapFile *res = stream->abstract;
+    swMmapFile *res = (swMmapFile *) stream->abstract;
 
-    int n_write = MIN(res->memory + res->size - res->ptr, length);
+    ssize_t n_write = MIN((char* )res->memory + res->size - (char* )res->ptr, length);
     if (n_write == 0)
     {
         return 0;
@@ -74,11 +76,11 @@ static size_t mmap_stream_write(php_stream * stream, const char *buffer, size_t 
     return n_write;
 }
 
-static size_t mmap_stream_read(php_stream *stream, char *buffer, size_t length)
+static ssize_t mmap_stream_read(php_stream *stream, char *buffer, size_t length)
 {
-    swMmapFile *res = stream->abstract;
+    swMmapFile *res = (swMmapFile *) stream->abstract;
 
-    int n_read = MIN(res->memory + res->size - res->ptr, length);
+    ssize_t n_read = MIN((char * )res->memory + res->size - (char * )res->ptr, length);
     if (n_read == 0)
     {
         return 0;
@@ -90,13 +92,13 @@ static size_t mmap_stream_read(php_stream *stream, char *buffer, size_t length)
 
 static int mmap_stream_flush(php_stream *stream)
 {
-    swMmapFile *res = stream->abstract;
+    swMmapFile *res = (swMmapFile *) stream->abstract;
     return msync(res->memory, res->size, MS_SYNC | MS_INVALIDATE);
 }
 
-static int mmap_stream_seek(php_stream *stream, off_t offset, int whence, off_t *newoffset)
+static int mmap_stream_seek(php_stream *stream, zend_off_t offset, int whence, zend_off_t *newoffset)
 {
-    swMmapFile *res = stream->abstract;
+    swMmapFile *res = (swMmapFile *) stream->abstract;
 
     switch (whence)
     {
@@ -116,7 +118,7 @@ static int mmap_stream_seek(php_stream *stream, off_t offset, int whence, off_t 
             return -1;
         }
         res->ptr += offset;
-        *newoffset = res->ptr - res->memory;
+        *newoffset = (char *) res->ptr - (char *) res->memory;
         return 0;
     case SEEK_END:
         if (offset > 0 || -1 * offset > res->size)
@@ -125,7 +127,7 @@ static int mmap_stream_seek(php_stream *stream, off_t offset, int whence, off_t 
             return -1;
         }
         res->ptr = res->memory + res->size + offset;
-        *newoffset = res->ptr - res->memory;
+        *newoffset =  (char *) res->ptr - (char *) res->memory;
         return 0;
     default:
         *newoffset = (off_t) -1;
@@ -135,7 +137,7 @@ static int mmap_stream_seek(php_stream *stream, off_t offset, int whence, off_t 
 
 static int mmap_stream_close(php_stream *stream, int close_handle)
 {
-    swMmapFile *res = stream->abstract;
+    swMmapFile *res = (swMmapFile *) stream->abstract;
     if (close_handle)
     {
         munmap(res->memory, res->size);
@@ -210,7 +212,7 @@ static PHP_METHOD(swoole_mmap, open)
         RETURN_FALSE;
     }
 
-    swMmapFile *res = emalloc(sizeof(swMmapFile));
+    swMmapFile *res = (swMmapFile *) emalloc(sizeof(swMmapFile));
     res->filename = filename;
     res->size = size;
     res->offset = offset;

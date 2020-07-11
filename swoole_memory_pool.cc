@@ -17,6 +17,7 @@
  */
 
 #include "php_swoole_async.h"
+#include "ext/swoole/include/swoole_memory.h"
 
 enum memory_pool_type
 {

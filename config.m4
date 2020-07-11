@@ -70,14 +70,14 @@ if test "$PHP_SWOOLE_ASYNC" != "no"; then
         swoole_async.cc \
         swoole_async_client.cc \
         swoole_buffer.cc \
-    	swoole_channel.c \
+    	swoole_channel.cc \
         swoole_http_client.cc \
-        swoole_memory_pool.c \
-    	swoole_mmap.c \
-        swoole_msgqueue.c \
-        swoole_mysql.c \
-        swoole_redis.c \
-        swoole_ringqueue.c \
+        swoole_memory_pool.cc \
+    	swoole_mmap.cc \
+        swoole_msgqueue.cc \
+        swoole_mysql.cc \
+        swoole_redis.cc \
+        swoole_ringqueue.cc \
     "
 
     PHP_NEW_EXTENSION(swoole_async, $swoole_source_file, $ext_shared,,, cxx)

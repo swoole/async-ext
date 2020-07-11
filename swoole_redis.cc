@@ -205,7 +205,7 @@ static PHP_METHOD(swoole_redis, __construct)
         RETURN_FALSE;
     }
 
-    swRedisClient *redis = emalloc(sizeof(swRedisClient));
+    swRedisClient *redis = (swRedisClient *) emalloc(sizeof(swRedisClient));
     bzero(redis, sizeof(swRedisClient));
 
     redis->object = ZEND_THIS;
@@ -274,7 +274,7 @@ static PHP_METHOD(swoole_redis, on)
         RETURN_FALSE;
     }
 
-    swRedisClient *redis = swoole_get_object(ZEND_THIS);
+    swRedisClient *redis = (swRedisClient *) swoole_get_object(ZEND_THIS);
     if (redis->context != NULL)
     {
         php_swoole_fatal_error(E_WARNING, "Must be called before connecting.");
@@ -319,7 +319,7 @@ static PHP_METHOD(swoole_redis, connect)
         RETURN_FALSE;
     }
 
-    swRedisClient *redis = swoole_get_object(ZEND_THIS);
+    swRedisClient *redis = (swRedisClient *) swoole_get_object(ZEND_THIS);
     redisAsyncContext *context;
 
     if (strncasecmp(host, ZEND_STRL("unix:/")) == 0)
@@ -350,11 +350,11 @@ static PHP_METHOD(swoole_redis, connect)
     }
 
     php_swoole_check_reactor();
-    if (!swReactor_isset_handler(sw_reactor(), PHP_SWOOLE_FD_REDIS))
+    if (!swoole_event_isset_handler(PHP_SWOOLE_FD_REDIS))
     {
-        swReactor_set_handler(sw_reactor(), PHP_SWOOLE_FD_REDIS | SW_EVENT_READ, swoole_redis_onRead);
-        swReactor_set_handler(sw_reactor(), PHP_SWOOLE_FD_REDIS | SW_EVENT_WRITE, swoole_redis_onWrite);
-        swReactor_set_handler(sw_reactor(), PHP_SWOOLE_FD_REDIS | SW_EVENT_ERROR, swoole_redis_onError);
+        swoole_event_set_handler(PHP_SWOOLE_FD_REDIS | SW_EVENT_READ, swoole_redis_onRead);
+        swoole_event_set_handler(PHP_SWOOLE_FD_REDIS | SW_EVENT_WRITE, swoole_redis_onWrite);
+        swoole_event_set_handler(PHP_SWOOLE_FD_REDIS | SW_EVENT_ERROR, swoole_redis_onError);
     }
 
     redisAsyncSetConnectCallback(context, swoole_redis_onConnect);
@@ -374,7 +374,7 @@ static PHP_METHOD(swoole_redis, connect)
     zend_update_property_string(swoole_redis_ce, ZEND_THIS, ZEND_STRL("host"), host);
     zend_update_property_long(swoole_redis_ce, ZEND_THIS, ZEND_STRL("port"), port);
 
-    swSocket *conn = swSocket_new(redis->context->c.fd, PHP_SWOOLE_FD_REDIS);
+    swSocket *conn = swSocket_new(redis->context->c.fd, (enum swFd_type) PHP_SWOOLE_FD_REDIS);
     if (conn == NULL)
     {
         redisAsyncFree(context);
@@ -400,7 +400,7 @@ static PHP_METHOD(swoole_redis, connect)
 
 static void redis_close(void* data)
 {
-    swRedisClient *redis = data;
+    swRedisClient *redis = (swRedisClient *) data;
     if (redis->context)
     {
         redisAsyncDisconnect(redis->context);
@@ -441,12 +441,12 @@ static void inline redis_free_memory(int argc, char **argv, size_t *argvlen, swR
 
 static PHP_METHOD(swoole_redis, close)
 {
-    swRedisClient *redis = swoole_get_object(ZEND_THIS);
+    swRedisClient *redis = (swRedisClient *) swoole_get_object(ZEND_THIS);
     if (redis && redis->context && redis->state != SWOOLE_REDIS_STATE_CLOSED)
     {
         if (redis->connecting)
         {
-            sw_reactor()->defer(sw_reactor(), redis_close, redis);
+            swoole_event_defer(redis_close, redis);
         }
         else
         {
@@ -459,7 +459,7 @@ static PHP_METHOD(swoole_redis, __destruct)
 {
     SW_PREVENT_USER_DESTRUCT();
 
-    swRedisClient *redis = swoole_get_object(ZEND_THIS);
+    swRedisClient *redis = (swRedisClient *) swoole_get_object(ZEND_THIS);
     if (redis)
     {
         if (redis->context && redis->state != SWOOLE_REDIS_STATE_CLOSED)
@@ -492,7 +492,7 @@ static PHP_METHOD(swoole_redis, __call)
         RETURN_FALSE;
     }
 
-    swRedisClient *redis = swoole_get_object(ZEND_THIS);
+    swRedisClient *redis = (swRedisClient *) swoole_get_object(ZEND_THIS);
     if (!redis)
     {
         php_swoole_fatal_error(E_WARNING, "the object is not an instance of swoole_redis.");
@@ -537,8 +537,8 @@ static PHP_METHOD(swoole_redis, __call)
 
     if (argc > SW_REDIS_COMMAND_BUFFER_SIZE)
     {
-        argvlen = emalloc(sizeof(size_t) * argc);
-        argv = emalloc(sizeof(char*) * argc);
+        argvlen = (size_t *) emalloc(sizeof(size_t) * argc);
+        argv = (char **) emalloc(sizeof(char*) * argc);
         free_mm = 1;
     }
     else
@@ -637,7 +637,7 @@ static PHP_METHOD(swoole_redis, __call)
 
 static PHP_METHOD(swoole_redis, getState)
 {
-    swRedisClient *redis = swoole_get_object(ZEND_THIS);
+    swRedisClient *redis = (swRedisClient *) swoole_get_object(ZEND_THIS);
     if (!redis)
     {
         php_swoole_fatal_error(E_WARNING, "object is not instanceof swoole_redis.");
@@ -648,14 +648,13 @@ static PHP_METHOD(swoole_redis, getState)
 
 static void swoole_redis_set_error(swRedisClient *redis, zval* return_value, redisReply* reply)
 {
-    char *str = malloc(reply->len + 1);
-    memcpy(str, reply->str, reply->len);
-    str[reply->len] = 0;
+    auto str = zend_string_alloc(reply->len, 0);
+    memcpy(str->val, reply->str, reply->len);
+    str->val[reply->len] = 0;
 
     ZVAL_FALSE(return_value);
     zend_update_property_long(swoole_redis_ce, redis->object, ZEND_STRL("errCode"), -1);
-    zend_update_property_string(swoole_redis_ce, redis->object, ZEND_STRL("errMsg"), str);
-    free(str);
+    zend_update_property_str(swoole_redis_ce, redis->object, ZEND_STRL("errMsg"), str);
 }
 
 static void swoole_redis_parse_result(swRedisClient *redis, zval* return_value, redisReply* reply)
@@ -714,7 +713,7 @@ static void swoole_redis_parse_result(swRedisClient *redis, zval* return_value, 
 
 static void swoole_redis_onTimeout(swTimer *timer, swTimer_node *tnode)
 {
-    swRedisClient *redis = tnode->data;
+    swRedisClient *redis = (swRedisClient *) tnode->data;
     redis->timer = NULL;
     zend_update_property_long(swoole_redis_ce, redis->object, ZEND_STRL("errCode"), ETIMEDOUT);
     zend_update_property_string(swoole_redis_ce, redis->object, ZEND_STRL("errMsg"), strerror(ETIMEDOUT));
@@ -729,7 +728,7 @@ static void swoole_redis_onTimeout(swTimer *timer, swTimer_node *tnode)
 
 static void swoole_redis_onCompleted(redisAsyncContext *c, void *r, void *privdata)
 {
-    swRedisClient *redis = c->ev.data;
+    swRedisClient *redis = (swRedisClient *) c->ev.data;
     if (redis->state == SWOOLE_REDIS_STATE_CLOSED)
     {
         return;
@@ -737,7 +736,7 @@ static void swoole_redis_onCompleted(redisAsyncContext *c, void *r, void *privda
 
     if (redis->failure == 0)
     {
-        redisReply *reply = r;
+        redisReply *reply = (redisReply *) r;
         switch (reply->type)
         {
         case REDIS_REPLY_ERROR:
@@ -784,7 +783,7 @@ static void swoole_redis_onCompleted(redisAsyncContext *c, void *r, void *privda
 
 static void swoole_redis_onResult(redisAsyncContext *c, void *r, void *privdata)
 {
-    redisReply *reply = r;
+    redisReply *reply = (redisReply *) r;
     if (reply == NULL)
     {
         return;
@@ -792,7 +791,7 @@ static void swoole_redis_onResult(redisAsyncContext *c, void *r, void *privdata)
 
     zend_bool is_subscribe = 0;
     char *callback_type;
-    swRedisClient *redis = c->ev.data;
+    swRedisClient *redis = (swRedisClient *) c->ev.data;
     zval result, *retval, *callback;
 
     swoole_redis_parse_result(redis, &result, reply);
@@ -840,7 +839,7 @@ static void swoole_redis_onResult(redisAsyncContext *c, void *r, void *privdata)
 
 void swoole_redis_onConnect(const redisAsyncContext *c, int status)
 {
-    swRedisClient *redis = c->ev.data;
+    swRedisClient *redis = (swRedisClient *) c->ev.data;
 
     if (redis->timer)
     {
@@ -854,7 +853,7 @@ void swoole_redis_onConnect(const redisAsyncContext *c, int status)
         zend_update_property_string(swoole_redis_ce, redis->object, ZEND_STRL("errMsg"), c->errstr);
         redis->state = SWOOLE_REDIS_STATE_CLOSED;
         redis_execute_connect_callback(redis, 0);
-        sw_reactor()->defer(sw_reactor(), redis_free_object, redis->object);
+        swoole_event_defer(redis_free_object, redis->object);
         redis->socket->fd = -1;
         swSocket_free(redis->socket);
         redis->socket = NULL;
@@ -884,7 +883,7 @@ void swoole_redis_onConnect(const redisAsyncContext *c, int status)
 
 void swoole_redis_onClose(const redisAsyncContext *c, int status)
 {
-    swRedisClient *redis = c->ev.data;
+    swRedisClient *redis = (swRedisClient *) c->ev.data;
     redis->state = SWOOLE_REDIS_STATE_CLOSED;
     redis->context = NULL;
 
@@ -913,7 +912,7 @@ void swoole_redis_onClose(const redisAsyncContext *c, int status)
 
 static int swoole_redis_onError(swReactor *reactor, swEvent *event)
 {
-    swRedisClient *redis = event->socket->object;
+    swRedisClient *redis = (swRedisClient *) event->socket->object;
     zval *zcallback = sw_zend_read_property(swoole_redis_ce, redis->object, ZEND_STRL("onConnect"), 0);
 
     if (!ZVAL_IS_NULL(zcallback))
@@ -994,7 +993,7 @@ static void swoole_redis_event_Cleanup(void *privdata)
 
 static int swoole_redis_onRead(swReactor *reactor, swEvent *event)
 {
-    swRedisClient *redis = event->socket->object;
+    swRedisClient *redis = (swRedisClient *) event->socket->object;
     if (redis->context && sw_reactor())
     {
         redisAsyncHandleRead(redis->context);
@@ -1004,7 +1003,7 @@ static int swoole_redis_onRead(swReactor *reactor, swEvent *event)
 
 static int swoole_redis_onWrite(swReactor *reactor, swEvent *event)
 {
-    swRedisClient *redis = event->socket->object;
+    swRedisClient *redis = (swRedisClient *) event->socket->object;
     if (redis->context && sw_reactor())
     {
         redisAsyncHandleWrite(redis->context);

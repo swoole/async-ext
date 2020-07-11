@@ -18,6 +18,7 @@
 
 #include "swoole_mysql_async.h"
 
+#include "ext/swoole/include/client.h"
 // see mysqlnd 'L64' macro redefined
 #undef L64
 #include "ext/hash/php_hash.h"
@@ -500,14 +501,6 @@ int mysql_get_result(mysql_connector *connector, char *buf, int len)
     }
 }
 
-static void php_swoole_sha256(const char *str, int _len, unsigned char *digest)
-{
-    PHP_SHA256_CTX context;
-    PHP_SHA256Init(&context);
-    PHP_SHA256Update(&context, (unsigned char *) str, _len);
-    PHP_SHA256Final(digest, &context);
-}
-
 //sha256
 static void mysql_sha2_password_with_nonce(char* ret, char* nonce, char* password, size_t password_len)
 {
@@ -539,18 +532,18 @@ static int mysql_auth_encrypt_dispatch(char *buf, char *auth_plugin_name, char *
         // auth-response
         char hash_0[20];
         bzero(hash_0, sizeof (hash_0));
-        swoole_sha1(password, password_len, (uchar *) hash_0);
+        php_swoole_sha1(password, password_len, (uchar *) hash_0);
 
         char hash_1[20];
         bzero(hash_1, sizeof (hash_1));
-        swoole_sha1(hash_0, sizeof (hash_0), (uchar *) hash_1);
+        php_swoole_sha1(hash_0, sizeof (hash_0), (uchar *) hash_1);
 
         char str[40];
         memcpy(str, nonce, 20);
         memcpy(str + 20, hash_1, 20);
 
         char hash_2[20];
-        swoole_sha1(str, sizeof (str), (uchar *) hash_2);
+        php_swoole_sha1(str, sizeof (str), (uchar *) hash_2);
 
         char hash_3[20];
 
@@ -994,7 +987,7 @@ static int mysql_parse_prepare_result(mysql_client *client, char *buf, size_t n_
     // skip the packet header
     buf += SW_MYSQL_PACKET_HEADER_SIZE;
 
-    mysql_statement *stmt = emalloc(sizeof(mysql_statement));
+    mysql_statement *stmt = (mysql_statement *) emalloc(sizeof(mysql_statement));
     // status (1) -- [00] OK
     buf += 1;
 
@@ -2112,6 +2105,8 @@ int mysql_is_over(mysql_client *client)
     char *p;
     off_t remaining_size;
     uint32_t packet_length;
+    off_t temp_remaining_len = 0;
+    ulong_t val = 0;
 
     if (buffer->length < client->want_length)
     {
@@ -2153,10 +2148,10 @@ int mysql_is_over(mysql_client *client)
             }
             case SW_MYSQL_PACKET_OK: // ok
             {
-                ulong_t val = 0;
+                val = 0;
                 char nul;
                 int retcode;
-                off_t temp_remaining_len = remaining_size;
+                temp_remaining_len = remaining_size;
 
                 // +type
                 p++;
@@ -2252,7 +2247,7 @@ int mysql_response(mysql_client *client)
                 client->response.num_column = client->statement->field_count;
                 if (client->response.num_column > 0)
                 {
-                    client->response.columns = ecalloc(client->response.num_column, sizeof(mysql_field));
+                    client->response.columns = (mysql_field *) ecalloc(client->response.num_column, sizeof(mysql_field));
                 }
                 if (client->statement->param_count > 0)
                 {
@@ -2286,7 +2281,7 @@ int mysql_response(mysql_client *client)
                 // easy to the safe side: but under what circumstances would num_column will be 0 in result set?
                 if (client->response.num_column > 0)
                 {
-                    client->response.columns = ecalloc(client->response.num_column, sizeof(mysql_field));
+                    client->response.columns = (mysql_field *) ecalloc(client->response.num_column, sizeof(mysql_field));
                 }
 
                 client->state = SW_MYSQL_STATE_READ_FIELD;
@@ -2351,13 +2346,13 @@ static int mysql_query(zval *zobject, mysql_client *client, swString *sql, zval 
 {
     if (!client->cli)
     {
-        SwooleG.error = SW_ERROR_CLIENT_NO_CONNECTION;
+        swoole_set_last_error(SW_ERROR_CLIENT_NO_CONNECTION);
         php_swoole_fatal_error(E_WARNING, "mysql connection#%d is closed.", client->cli->socket->fd);
         return SW_ERR;
     }
     if (!client->connected)
     {
-        SwooleG.error = SW_ERROR_CLIENT_NO_CONNECTION;
+        swoole_set_last_error(SW_ERROR_CLIENT_NO_CONNECTION);
         php_swoole_error(E_WARNING, "mysql client is not connected to server.");
         return SW_ERR;
     }
@@ -2440,7 +2435,7 @@ void mysql_column_info(mysql_field *field)
 
 static PHP_METHOD(swoole_mysql, __construct)
 {
-    mysql_client *client = emalloc(sizeof(mysql_client));
+    mysql_client *client = (mysql_client *) emalloc(sizeof(mysql_client));
 
     bzero(client, sizeof(mysql_client));
     swoole_set_object(ZEND_THIS, client);
@@ -2457,7 +2452,7 @@ static PHP_METHOD(swoole_mysql, connect)
         RETURN_FALSE;
     }
 
-    mysql_client *client = swoole_get_object(ZEND_THIS);
+    mysql_client *client = (mysql_client *) swoole_get_object(ZEND_THIS);
     if (client->cli)
     {
         php_swoole_error(E_WARNING, "The mysql client is already connected server.");
@@ -2473,6 +2468,9 @@ static PHP_METHOD(swoole_mysql, connect)
     zend_string *str_charset = NULL;
     zend_bool _retval = SW_TRUE;
 
+    int ret = 0;
+    swClient *cli = NULL;
+    enum swSocket_type type = SW_SOCK_TCP;
     mysql_connector *connector = &client->connector;
 
     if (php_swoole_array_get_value(_ht, "host", value))
@@ -2566,8 +2564,7 @@ static PHP_METHOD(swoole_mysql, connect)
         connector->fetch_mode = zval_is_true(value);
     }
 
-    swClient *cli = emalloc(sizeof(swClient));
-    int type = SW_SOCK_TCP;
+    cli = (swClient *) emalloc(sizeof(swClient));
 
     if (strncasecmp(connector->host, ZEND_STRL("unix:/")) == 0)
     {
@@ -2619,7 +2616,7 @@ static PHP_METHOD(swoole_mysql, connect)
     connector->password = estrndup(connector->password, connector->password_len);
     connector->database = estrndup(connector->database, connector->database_len);
 
-    int ret = cli->connect(cli, connector->host, connector->port, connector->timeout, 0);
+    ret = cli->connect(cli, connector->host, connector->port, connector->timeout, 0);
     if (ret < 0)
     {
         snprintf(buf, sizeof(buf), "connect to mysql server[%s:%ld] failed.", connector->host, connector->port);
@@ -2672,7 +2669,7 @@ static PHP_METHOD(swoole_mysql, query)
         RETURN_FALSE;
     }
 
-    mysql_client *client = swoole_get_object(ZEND_THIS);
+    mysql_client *client = (mysql_client *) swoole_get_object(ZEND_THIS);
     if (!client)
     {
         php_swoole_fatal_error(E_WARNING, "object is not instanceof swoole_mysql.");
@@ -2695,7 +2692,7 @@ static PHP_METHOD(swoole_mysql, begin)
         RETURN_FALSE;
     }
 
-    mysql_client *client = swoole_get_object(ZEND_THIS);
+    mysql_client *client = (mysql_client *) swoole_get_object(ZEND_THIS);
     if (!client)
     {
         php_swoole_fatal_error(E_WARNING, "object is not instanceof swoole_mysql.");
@@ -2734,7 +2731,7 @@ static PHP_METHOD(swoole_mysql, commit)
         RETURN_FALSE;
     }
 
-    mysql_client *client = swoole_get_object(ZEND_THIS);
+    mysql_client *client = (mysql_client *) swoole_get_object(ZEND_THIS);
     if (!client)
     {
         php_swoole_fatal_error(E_WARNING, "object is not instanceof swoole_mysql.");
@@ -2774,7 +2771,7 @@ static PHP_METHOD(swoole_mysql, rollback)
     }
 
 
-    mysql_client *client = swoole_get_object(ZEND_THIS);
+    mysql_client *client = (mysql_client *) swoole_get_object(ZEND_THIS);
     if (!client)
     {
         php_swoole_fatal_error(E_WARNING, "object is not instanceof swoole_mysql.");
@@ -2804,7 +2801,7 @@ static PHP_METHOD(swoole_mysql, __destruct)
 {
     SW_PREVENT_USER_DESTRUCT();
 
-    mysql_client *client = swoole_get_object(ZEND_THIS);
+    mysql_client *client = (mysql_client *) swoole_get_object(ZEND_THIS);
     if (client && client->cli)
     {
         sw_zend_call_method_with_0_params(ZEND_THIS, swoole_mysql_ce, NULL, "close", NULL);
@@ -2815,7 +2812,7 @@ static PHP_METHOD(swoole_mysql, __destruct)
 
 static PHP_METHOD(swoole_mysql, close)
 {
-    mysql_client *client = swoole_get_object(ZEND_THIS);
+    mysql_client *client = (mysql_client *) swoole_get_object(ZEND_THIS);
     if (!client)
     {
         php_swoole_fatal_error(E_WARNING, "object is not instanceof swoole_mysql.");
@@ -2856,7 +2853,7 @@ static PHP_METHOD(swoole_mysql, on)
         RETURN_FALSE;
     }
 
-    mysql_client *client = swoole_get_object(ZEND_THIS);
+    mysql_client *client = (mysql_client *) swoole_get_object(ZEND_THIS);
     if (!client)
     {
         php_swoole_fatal_error(E_WARNING, "object is not instanceof swoole_mysql.");
@@ -2877,7 +2874,7 @@ static PHP_METHOD(swoole_mysql, on)
 
 static PHP_METHOD(swoole_mysql, getState)
 {
-    mysql_client *client = swoole_get_object(ZEND_THIS);
+    mysql_client *client = (mysql_client *) swoole_get_object(ZEND_THIS);
     if (!client)
     {
         php_swoole_fatal_error(E_WARNING, "object is not instanceof swoole_mysql.");
@@ -2890,7 +2887,7 @@ static void mysql_client_onError(swClient *cli)
 {
     mysql_client *client = (mysql_client *) cli->object;
 
-    client->connector.error_code = SwooleG.error;
+    client->connector.error_code =   swoole_get_last_error();;
     client->connector.error_msg = strerror(client->connector.error_code);
     client->connector.error_length = strlen(client->connector.error_msg);
 
@@ -3210,7 +3207,7 @@ static PHP_METHOD(swoole_mysql, escape)
         RETURN_FALSE;
     }
 
-    mysql_client *client = swoole_get_object(ZEND_THIS);
+    mysql_client *client = (mysql_client *) swoole_get_object(ZEND_THIS);
     if (!client)
     {
         php_swoole_fatal_error(E_WARNING, "object is not instanceof swoole_mysql.");
@@ -3222,7 +3219,7 @@ static PHP_METHOD(swoole_mysql, escape)
         RETURN_FALSE;
     }
 
-    char *newstr = safe_emalloc(2, str.length + 1, 1);
+    char *newstr = (char *) safe_emalloc(2, str.length + 1, 1);
     if (newstr == NULL)
     {
         php_swoole_fatal_error(E_ERROR, "emalloc(%ld) failed.", str.length + 1);
