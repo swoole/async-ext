@@ -18,6 +18,7 @@
 
 #include "ext/swoole/thirdparty/hiredis/hiredis.h"
 #include "ext/swoole/thirdparty/hiredis/async.h"
+#include "ext/swoole/include/swoole_timer.h"
 
 #define SW_REDIS_COMMAND_BUFFER_SIZE   64
 #define SW_REDIS_COMMAND_KEY_SIZE      128
@@ -659,7 +660,7 @@ static void swoole_redis_set_error(swRedisClient *redis, zval* return_value, red
 
 static void swoole_redis_parse_result(swRedisClient *redis, zval* return_value, redisReply* reply)
 {
-    int j;
+    size_t j;
     zval _val, *val = &_val;
 
     switch (reply->type)
@@ -790,7 +791,7 @@ static void swoole_redis_onResult(redisAsyncContext *c, void *r, void *privdata)
     }
 
     zend_bool is_subscribe = 0;
-    char *callback_type;
+    const char *callback_type;
     swRedisClient *redis = (swRedisClient *) c->ev.data;
     zval result, *retval, *callback;
 
