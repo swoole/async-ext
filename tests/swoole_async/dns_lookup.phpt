@@ -1,6 +1,5 @@
 --TEST--
 swoole_async: swoole_async_dns_lookup
-
 --SKIPIF--
 <?php require  __DIR__ . '/../include/skipif.inc'; ?>
 --FILE--

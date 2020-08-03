@@ -75,9 +75,6 @@ static PHP_METHOD(swoole_async_client, on);
 static PHP_METHOD(swoole_async_client, getSocket);
 #endif
 
-static swClient* php_swoole_async_client_new(zval *zobject, char *host, int host_len, int port);
-static void php_swoole_async_client_free(zval *zobject, swClient *cli);
-
 static void client_onConnect(swClient *cli);
 static void client_onReceive(swClient *cli, const char *data, uint32_t length);
 static void client_onClose(swClient *cli);
@@ -333,50 +330,41 @@ static void client_onBufferEmpty(swClient *cli)
     client_execute_callback(zobject, SW_CLIENT_CB_onBufferEmpty);
 }
 
-static void php_swoole_async_client_free(zval *zobject, swClient *cli)
+void php_swoole_async_client_free(zval *zobject, swClient *cli)
 {
-    if (cli->timer)
-    {
+    if (cli->timer) {
         swoole_timer_del(cli->timer);
         cli->timer = NULL;
     }
     //socks5 proxy config
-    if (cli->socks5_proxy)
-    {
+    if (cli->socks5_proxy) {
         efree((void* )cli->socks5_proxy->host);
-        if (cli->socks5_proxy->username)
-        {
+        if (cli->socks5_proxy->username) {
             efree((void* )cli->socks5_proxy->username);
         }
-        if (cli->socks5_proxy->password)
-        {
+        if (cli->socks5_proxy->password) {
             efree((void* )cli->socks5_proxy->password);
         }
         efree(cli->socks5_proxy);
     }
     //http proxy config
-    if (cli->http_proxy)
-    {
+    if (cli->http_proxy) {
         efree((void* ) cli->http_proxy->proxy_host);
-        if (cli->http_proxy->user)
-        {
+        if (cli->http_proxy->user) {
             efree((void* )cli->http_proxy->user);
         }
-        if (cli->http_proxy->password)
-        {
+        if (cli->http_proxy->password) {
             efree((void* )cli->http_proxy->password);
         }
         efree(cli->http_proxy);
     }
-    if (cli->protocol.private_data)
-    {
+    if (cli->protocol.private_data) {
         sw_zend_fci_cache_discard((zend_fcall_info_cache *) cli->protocol.private_data);
         efree(cli->protocol.private_data);
         cli->protocol.private_data = nullptr;
     }
 
-    swClient_free(cli);
-    efree(cli);
+    cli->destroy();
 
 #ifdef SWOOLE_SOCKETS_SUPPORT
     zval *zsocket = (zval *) swoole_get_property(zobject, client_property_socket);
@@ -390,7 +378,7 @@ static void php_swoole_async_client_free(zval *zobject, swClient *cli)
     swoole_set_object(zobject, NULL);
 }
 
-static swClient* php_swoole_async_client_new(zval *zobject, char *host, int host_len, int port)
+swClient* php_swoole_async_client_new(zval *zobject, char *host, int host_len, int port)
 {
     zval *ztype = sw_zend_read_property(Z_OBJCE_P(zobject), zobject, ZEND_STRL("type"), 0);
     if (ztype == NULL || ZVAL_IS_NULL(ztype))
@@ -409,10 +397,11 @@ static swClient* php_swoole_async_client_new(zval *zobject, char *host, int host
         return NULL;
     }
 
-    swClient *cli = (swClient*) emalloc(sizeof(swClient));
-    if (swClient_create(cli, client_type, 1) < 0)
+    swClient *cli = new swClient(client_type, true);
+    if (cli->socket == nullptr)
     {
         php_swoole_sys_error(E_WARNING, "swClient_create() failed");
+        delete cli;
         zend_update_property_long(Z_OBJCE_P(zobject), zobject, ZEND_STRL("errCode"), errno);
         return NULL;
     }
@@ -567,7 +556,7 @@ static PHP_METHOD(swoole_async_client, connect)
         php_swoole_fatal_error(E_ERROR, "no 'onReceive' callback function");
         RETURN_FALSE;
     }
-    if (swSocket_is_stream(cli->type))
+    if (swSocket::is_stream(cli->type))
     {
         if (!cb->cache_onConnect.function_handler)
         {
@@ -712,25 +701,7 @@ static PHP_METHOD(swoole_async_client, sendto)
         swoole_set_object(ZEND_THIS, cli);
     }
 
-    int ret;
-    if (cli->type == SW_SOCK_UDP)
-    {
-        ret = swSocket_udp_sendto(cli->socket->fd, ip, port, data, len);
-    }
-    else if (cli->type == SW_SOCK_UDP6)
-    {
-        ret = swSocket_udp_sendto6(cli->socket->fd, ip, port, data, len);
-    }
-    else if (cli->type == SW_SOCK_UNIX_DGRAM)
-    {
-        ret = swSocket_unix_sendto(cli->socket->fd, ip, data, len);
-    }
-    else
-    {
-        php_swoole_fatal_error(E_WARNING, "only supports SWOOLE_SOCK_(UDP/UDP6/UNIX_DGRAM)");
-        RETURN_FALSE;
-    }
-    SW_CHECK_RETURN(ret);
+    RETURN_BOOL(cli->socket->sendto(ip, port, data, len) > 0);
 }
 
 static PHP_METHOD(swoole_async_client, sendfile)
@@ -931,7 +902,7 @@ static PHP_METHOD(swoole_async_client, close)
     }
     if (sw_unlikely(SWOOLE_G(req_status) != PHP_SWOOLE_CALL_USER_SHUTDOWNFUNC_BEGIN))
     {
-        ret = cli->close(cli);
+        ret = cli->close();
     }
     SW_CHECK_RETURN(ret);
 }
@@ -1009,7 +980,7 @@ static PHP_METHOD(swoole_async_client, sleep)
     {
         RETURN_FALSE;
     }
-    SW_CHECK_RETURN(swClient_sleep(cli));
+    SW_CHECK_RETURN(cli->sleep());
 }
 
 static PHP_METHOD(swoole_async_client, wakeup)
@@ -1019,7 +990,7 @@ static PHP_METHOD(swoole_async_client, wakeup)
     {
         RETURN_FALSE;
     }
-    SW_CHECK_RETURN(swClient_wakeup(cli));
+    SW_CHECK_RETURN(cli->wakeup());
 }
 
 #ifdef SW_USE_OPENSSL
@@ -1047,7 +1018,7 @@ static PHP_METHOD(swoole_async_client, enableSSL)
     {
         php_swoole_client_check_ssl_setting(cli, zset);
     }
-    if (swClient_enable_ssl_encrypt(cli) < 0)
+    if (cli->enable_ssl_encrypt() < 0)
     {
         RETURN_FALSE;
     }
@@ -1120,7 +1091,7 @@ static PHP_METHOD(swoole_async_client, verifyPeerCert)
     {
         RETURN_FALSE;
     }
-    SW_CHECK_RETURN(swClient_ssl_verify(cli, allow_self_signed));
+    SW_CHECK_RETURN(cli->ssl_verify(allow_self_signed));
 }
 #endif
 
@@ -1137,6 +1108,6 @@ static PHP_METHOD(swoole_async_client, shutdown)
     {
         RETURN_FALSE;
     }
-    SW_CHECK_RETURN(swClient_shutdown(cli, __how));
+    SW_CHECK_RETURN(cli->shutdown(__how));
 }
 

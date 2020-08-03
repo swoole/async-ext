@@ -40,23 +40,23 @@
 #define SW_REDIS_CONNECT_TIMEOUT         1.0
 #endif
 
-static sw_inline enum swBool_type php_swoole_is_callable(zval *callback)
+static sw_inline bool php_swoole_is_callable(zval *callback)
 {
     if (!callback || ZVAL_IS_NULL(callback))
     {
-        return SW_FALSE;
+        return false;
     }
     char *func_name = NULL;
     if (!sw_zend_is_callable(callback, 0, &func_name))
     {
         php_swoole_fatal_error(E_WARNING, "function '%s' is not callable", func_name);
         efree(func_name);
-        return SW_FALSE;
+        return false;
     }
     else
     {
         efree(func_name);
-        return SW_TRUE;
+        return true;
     }
 }
 
@@ -120,6 +120,9 @@ static sw_inline void* swoole_get_property(zval *zobject, int property_id)
     return swoole_get_property_by_handle(Z_OBJ_HANDLE_P(zobject), property_id);
 }
 
+swClient* php_swoole_async_client_new(zval *zobject, char *host, int host_len, int port);
+void php_swoole_async_client_free(zval *zobject, swClient *cli);
+
 BEGIN_EXTERN_C()
 
 void swoole_set_object_by_handle(uint32_t handle, void *ptr);
@@ -153,7 +156,6 @@ void swoole_memory_pool_init(int module_number);
 void swoole_mmap_init(int module_number);
 void swoole_msgqueue_init(int module_number);
 void swoole_mysql_init(int module_number);
-void swoole_redis_init(int module_number);
 void swoole_ringqueue_init(int module_number);
 
 END_EXTERN_C()

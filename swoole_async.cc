@@ -136,8 +136,8 @@ static uint16_t swoole_dns_request_id = 1;
 static swClient *resolver_socket = NULL;
 static std::unordered_map<std::string, swDNS_lookup_request *> *request_map;
 
-static void aio_onFileCompleted(swAio_event *event);
-static void aio_onDNSCompleted(swAio_event *event);
+static void aio_onFileCompleted(swoole::async::Event *event);
+static void aio_onDNSCompleted(swoole::async::Event *event);
 static void php_swoole_dns_callback(char *domain, swDNSResolver_result *result, void *data);
 
 static void php_swoole_file_request_free(void *data);
@@ -425,7 +425,7 @@ static void php_swoole_dns_callback(const char *domain, swDNSResolver_result *re
     zval_ptr_dtor(&args[1]);
 }
 
-static void aio_onDNSCompleted(swAio_event *event)
+static void aio_onDNSCompleted(swoole::async::Event *event)
 {
     int64_t ret;
 
@@ -481,9 +481,9 @@ static void aio_onDNSCompleted(swAio_event *event)
     }
 }
 
-static void aio_onFileCompleted(swAio_event *event)
+static void aio_onFileCompleted(swoole::async::Event *event)
 {
-    int isEOF = SW_FALSE;
+    int isEOF = false;
     int64_t ret = event->ret;
     file_request *file_req = (file_request *) event->object;
 
@@ -506,7 +506,7 @@ static void aio_onFileCompleted(swAio_event *event)
         if (ret == 0)
         {
             bzero(event->buf, event->nbytes);
-            isEOF = SW_TRUE;
+            isEOF = true;
         }
         else if (file_req->once == 1 && ret < file_req->length)
         {
@@ -601,7 +601,7 @@ static void aio_onFileCompleted(swAio_event *event)
         //continue to read
         else
         {
-            swAio_event ev;
+            swoole::async::Event ev;
             ev.canceled = 0;
             ev.fd = event->fd;
             ev.buf = event->buf;
@@ -609,10 +609,10 @@ static void aio_onFileCompleted(swAio_event *event)
             ev.offset = file_req->offset;
             ev.flags = 0;
             ev.object = file_req;
-            ev.handler = swAio_handler_read;
+            ev.handler = swoole::async::handler_read;
             ev.callback = aio_onFileCompleted;
 
-            ssize_t ret = swAio_dispatch(&ev);
+            ssize_t ret = swoole::async::dispatch(&ev);
             if (ret < 0)
             {
                 php_swoole_fatal_error(E_WARNING, "swoole_async: continue to read failed. Error: %s[%d]", strerror(event->error), event->error);
@@ -713,7 +713,7 @@ PHP_FUNCTION(swoole_async_read)
     req->length = buf_size;
     req->offset = offset;
 
-    swAio_event ev;
+    swoole::async::Event ev;
     ev.canceled = 0;
     ev.fd = fd;
     ev.buf = fcnt;
@@ -721,11 +721,11 @@ PHP_FUNCTION(swoole_async_read)
     ev.offset = offset;
     ev.flags = 0;
     ev.object = req;
-    ev.handler = swAio_handler_read;
+    ev.handler = swoole::async::handler_read;
     ev.callback = aio_onFileCompleted;
 
     php_swoole_check_reactor();
-    ssize_t ret = swAio_dispatch(&ev);
+    ssize_t ret = swoole::async::dispatch(&ev);
     if (ret == SW_ERR)
     {
         RETURN_FALSE;
@@ -820,7 +820,7 @@ PHP_FUNCTION(swoole_async_write)
 
     memcpy(wt_cnt, fcnt, fcnt_len);
 
-    swAio_event ev;
+    swoole::async::Event ev;
     ev.canceled = 0;
     ev.fd = fd;
     ev.buf = wt_cnt;
@@ -828,11 +828,11 @@ PHP_FUNCTION(swoole_async_write)
     ev.offset = offset;
     ev.flags = 0;
     ev.object = req;
-    ev.handler = swAio_handler_write;
+    ev.handler = swoole::async::handler_write;
     ev.callback = aio_onFileCompleted;
 
     php_swoole_check_reactor();
-    ssize_t ret = swAio_dispatch(&ev);
+    ssize_t ret = swoole::async::dispatch(&ev);
     if (ret == SW_ERR)
     {
         RETURN_FALSE;
@@ -905,7 +905,7 @@ PHP_FUNCTION(swoole_async_readfile)
     req->length = length;
     req->offset = 0;
 
-    swAio_event ev;
+    swoole::async::Event ev;
     ev.canceled = 0;
     ev.fd = fd;
     ev.buf = req->content;
@@ -913,11 +913,11 @@ PHP_FUNCTION(swoole_async_readfile)
     ev.offset = 0;
     ev.flags = 0;
     ev.object = req;
-    ev.handler = swAio_handler_read;
+    ev.handler = swoole::async::handler_read;
     ev.callback = aio_onFileCompleted;
 
     php_swoole_check_reactor();
-    ssize_t ret = swAio_dispatch(&ev);
+    ssize_t ret = swoole::async::dispatch(&ev);
     if (ret == SW_ERR)
     {
         RETURN_FALSE;
@@ -1004,7 +1004,7 @@ PHP_FUNCTION(swoole_async_writefile)
 
     memcpy(wt_cnt, fcnt, fcnt_len);
 
-    swAio_event ev;
+    swoole::async::Event ev;
     ev.canceled = 0;
     ev.fd = fd;
     ev.buf = wt_cnt;
@@ -1012,11 +1012,11 @@ PHP_FUNCTION(swoole_async_writefile)
     ev.offset = 0;
     ev.flags = 0;
     ev.object = req;
-    ev.handler = swAio_handler_write;
+    ev.handler = swoole::async::handler_write;
     ev.callback = aio_onFileCompleted;
 
     php_swoole_check_reactor();
-    ssize_t ret = swAio_dispatch(&ev);
+    ssize_t ret = swoole::async::dispatch(&ev);
     if (ret == SW_ERR)
     {
         RETURN_FALSE;
@@ -1054,10 +1054,10 @@ PHP_FUNCTION(swoole_async_set)
     }
     if (php_swoole_array_get_value(vht, "socket_buffer_size", v))
     {
-        SwooleG.socket_buffer_size = zval_get_long(v);
-        if (SwooleG.socket_buffer_size <= 0 || SwooleG.socket_buffer_size > INT_MAX)
+        swoole::network::Socket::default_buffer_size = zval_get_long(v);
+        if (swoole::network::Socket::default_buffer_size <= 0 || swoole::network::Socket::default_buffer_size > INT_MAX)
         {
-            SwooleG.socket_buffer_size = INT_MAX;
+            swoole::network::Socket::default_buffer_size = INT_MAX;
         }
     }
     if (php_swoole_array_get_value(vht, "log_level", v))
@@ -1413,15 +1413,10 @@ static int swDNSResolver_request(const char *domain, void (*callback)(const char
 
     if (resolver_socket == NULL)
     {
-        resolver_socket = (swClient *) sw_malloc(sizeof(swClient));
-        if (resolver_socket == NULL)
+        resolver_socket = new swClient(SW_SOCK_UDP, false);
+        if (!resolver_socket->socket)
         {
-            swWarn("malloc failed");
-            return SW_ERR;
-        }
-        if (swClient_create(resolver_socket, SW_SOCK_UDP, 0) < 0)
-        {
-            sw_free(resolver_socket);
+            delete resolver_socket;
             return SW_ERR;
         }
         do
@@ -1447,7 +1442,7 @@ static int swDNSResolver_request(const char *domain, void (*callback)(const char
         swoole_event_set_handler(SW_FD_DNS_RESOLVER, swDNSResolver_onReceive);
     }
 
-    if (!swReactor_exists(sw_reactor(), resolver_socket->socket))
+    if (!sw_reactor()->exists(resolver_socket->socket))
     {
         if (sw_reactor()->add(sw_reactor(), resolver_socket->socket, SW_FD_DNS_RESOLVER) < 0)
         {
@@ -1458,10 +1453,8 @@ static int swDNSResolver_request(const char *domain, void (*callback)(const char
     if (resolver_socket->send(resolver_socket, (char *) packet, steps, 0) < 0)
     {
         _do_close:
-        resolver_socket->close(resolver_socket);
-        swClient_free(resolver_socket);
-        sw_free(resolver_socket);
-        resolver_socket = NULL;
+        delete resolver_socket;
+        resolver_socket = nullptr;
         return SW_ERR;
     }
 
@@ -1534,20 +1527,20 @@ PHP_FUNCTION(swoole_async_dns_lookup)
     bzero(buf, buf_size);
     memcpy(buf, Z_STRVAL_P(domain), Z_STRLEN_P(domain));
 
-    swAio_event ev;
+    swoole::async::Event ev;
     ev.canceled = 0;
     ev.fd = 0;
     ev.buf = buf;
     ev.nbytes = buf_size;
     ev.offset = 0;
-    ev.flags = 0;
+    ev.flags = AF_INET;
     ev.object = req;
     ev.req = req;
-    ev.handler = swAio_handler_gethostbyname;
+    ev.handler = swoole::async::handler_gethostbyname;
     ev.callback = aio_onDNSCompleted;
 
     php_swoole_check_reactor();
-    SW_CHECK_RETURN(swAio_dispatch(&ev));
+    SW_CHECK_RETURN(swoole::async::dispatch(&ev));
 }
 
 static int process_stream_onRead(swReactor *reactor, swEvent *event)
@@ -1560,10 +1553,10 @@ static int process_stream_onRead(swReactor *reactor, swEvent *event)
     if (ret > 0)
     {
         ps->buffer->length += ret;
-        if (ps->buffer->length == ps->buffer->size && swString_extend(ps->buffer, ps->buffer->size * 2) == 0)
-        {
-            return SW_OK;
+        if (ps->buffer->length == ps->buffer->size) {
+            swString_extend(ps->buffer, ps->buffer->size * 2);
         }
+        return SW_OK;
     }
     else if (ret < 0)
     {
@@ -1616,7 +1609,7 @@ static int process_stream_onRead(swReactor *reactor, swEvent *event)
     }
     zval_ptr_dtor(&args[0]);
     zval_ptr_dtor(&args[1]);
-    swSocket_free(ps->socket);
+    ps->socket->free();
     efree(ps);
 
     return SW_OK;
@@ -1660,7 +1653,7 @@ PHP_METHOD(swoole_async, exec)
 
     ps->pid = pid;
     ps->buffer = buffer;
-    ps->socket = swSocket_new(fd, (enum swFd_type) PHP_SWOOLE_FD_PROCESS_STREAM);
+    ps->socket = swoole::make_socket(fd, (enum swFd_type) PHP_SWOOLE_FD_PROCESS_STREAM);
     ps->socket->object = ps;
 
     if (sw_reactor()->add(sw_reactor(), ps->socket, SW_EVENT_READ) < 0)
@@ -1702,7 +1695,6 @@ PHP_MINIT_FUNCTION(swoole_async)
     swoole_mmap_init(module_number);
     swoole_msgqueue_init(module_number);
     swoole_mysql_init(module_number);
-    swoole_redis_init(module_number);
     swoole_ringqueue_init(module_number);
 
     return SUCCESS;

@@ -118,7 +118,7 @@ static void http_client_onClose(swClient *cli);
 static void http_client_onError(swClient *cli);
 static void http_client_onRequestTimeout(swTimer *timer, swTimer_node *tnode);
 static void http_client_onResponseException(zval *zobject);
-static int http_client_onMessage(swProtocol *proto, swConnection *conn, const char *data, uint32_t length);
+static int http_client_onMessage(swProtocol *proto, swSocket *conn, const char *data, uint32_t length);
 
 static int http_client_send_http_request(zval *zobject);
 static int http_client_execute(zval *zobject, char *uri, size_t uri_len, zval *callback);
@@ -415,7 +415,7 @@ static int http_client_execute(zval *zobject, char *uri, size_t uri_len, zval *c
         return http_client_send_http_request(zobject) < 0 ? SW_ERR : SW_OK;
     }
 
-    swClient *cli = php_swoole_client_new(zobject, http->host, http->host_len, http->port);
+    swClient *cli = php_swoole_async_client_new(zobject, http->host, http->host_len, http->port);
     if (cli == NULL)
     {
         return SW_ERR;
@@ -765,7 +765,7 @@ static void http_client_onReceive(swClient *cli, const char *data, uint32_t leng
             if (buffer->length == buffer->size)
             {
                 swSysError("Wrong http response.");
-                cli->close(cli);
+                cli->close();
                 return;
             }
             buffer->offset = buffer->length - 4 <= 0 ? 0 : buffer->length - 4;
@@ -784,7 +784,7 @@ static void http_client_onReceive(swClient *cli, const char *data, uint32_t leng
     if (parsed_n < 0)
     {
         swSysError("Parsing http over socket[%d] failed.", cli->socket->fd);
-        cli->close(cli);
+        cli->close();
         return;
     }
 
@@ -855,7 +855,7 @@ static void http_client_onReceive(swClient *cli, const char *data, uint32_t leng
     if (http->upgrade && cli->buffer->length > 0)
     {
         cli->socket->skip_recv = 1;
-        swProtocol_recv_check_length(&cli->protocol, cli->socket, cli->buffer);
+        cli->protocol.recv_with_length_protocol(cli->socket, cli->buffer);
         return;
     }
 
@@ -1374,7 +1374,7 @@ static uint8_t http_client_free(zval *zobject)
     swClient *cli = http->cli;
     if (cli)
     {
-        php_swoole_client_free(zobject, cli);
+        php_swoole_async_client_free(zobject, cli);
         http->cli = NULL;
     }
     efree(http);
@@ -1430,7 +1430,7 @@ static PHP_METHOD(swoole_http_client, __construct)
     char *host;
     size_t host_len;
     zend_long port = 80;
-    zend_bool ssl = SW_FALSE;
+    zend_bool ssl = false;
 
     if (zend_parse_parameters(ZEND_NUM_ARGS(), "s|lb", &host, &host_len, &port, &ssl) == FAILURE)
     {
@@ -1675,7 +1675,7 @@ static PHP_METHOD(swoole_http_client, setMethod)
         RETURN_FALSE;
     }
 
-    int http_method = swHttp_get_method(method, length + 1);
+    int http_method = swHttp_get_method(method, length);
     if (length == 0 || http_method < 0)
     {
         php_swoole_error(E_WARNING, "invalid http method.");
@@ -1733,9 +1733,9 @@ static PHP_METHOD(swoole_http_client, close)
         RETURN_FALSE;
     }
     int ret = SW_OK;
-    if (!cli->keep || swSocket_error(swoole_get_last_error()) == SW_CLOSE)
+    if (!cli->keep || cli->socket->catch_error(swoole_get_last_error()) == SW_CLOSE)
     {
-        ret = cli->close(cli);
+        ret = cli->close();
     }
     else
     {

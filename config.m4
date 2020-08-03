@@ -76,7 +76,6 @@ if test "$PHP_SWOOLE_ASYNC" != "no"; then
     	swoole_mmap.cc \
         swoole_msgqueue.cc \
         swoole_mysql.cc \
-        swoole_redis.cc \
         swoole_ringqueue.cc \
     "
 

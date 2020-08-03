@@ -14,7 +14,7 @@
   +----------------------------------------------------------------------+
 */
 
-#include "php_swoole.h"
+#include "php_swoole_async.h"
 #include "ext/swoole/include/swoole_string.h"
 
 static zend_class_entry *swoole_buffer_ce;
@@ -145,7 +145,7 @@ static void swoole_buffer_recycle(swString *buffer)
     {
         return;
     }
-    swString_reduce(buffer, buffer->offset);
+    buffer->reduce(buffer->offset);
 }
 
 static PHP_METHOD(swoole_buffer, __construct)
@@ -215,7 +215,7 @@ static PHP_METHOD(swoole_buffer, append)
     }
 
     size_t size_old = buffer->size;
-    if (swString_append(buffer, &str) == SW_OK)
+    if (buffer->append(str) == SW_OK)
     {
         if (buffer->size > size_old)
         {
@@ -316,20 +316,15 @@ static PHP_METHOD(swoole_buffer, write)
     }
 
     size_t size_old = buffer->size;
-    if (swString_write(buffer, offset, &str) == SW_OK)
+    buffer->write(offset, &str);
+
+    if (buffer->size > size_old)
     {
-        if (buffer->size > size_old)
-        {
-            zend_update_property_long(swoole_buffer_ce, ZEND_THIS, ZEND_STRL("capacity"), buffer->size);
-        }
-        zend_update_property_long(swoole_buffer_ce, ZEND_THIS, ZEND_STRL("length"),
-                buffer->length - buffer->offset);
-        RETURN_LONG(buffer->length - buffer->offset);
+        zend_update_property_long(swoole_buffer_ce, ZEND_THIS, ZEND_STRL("capacity"), buffer->size);
     }
-    else
-    {
-        RETURN_FALSE;
-    }
+    zend_update_property_long(swoole_buffer_ce, ZEND_THIS, ZEND_STRL("length"),
+            buffer->length - buffer->offset);
+    RETURN_LONG(buffer->length - buffer->offset);
 }
 
 static PHP_METHOD(swoole_buffer, read)

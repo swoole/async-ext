@@ -378,11 +378,10 @@ static void mysql_client_free(mysql_client *client, zval* zobject)
         efree(client->connector.database);
         client->connector.database = NULL;
     }
-    //close the connection
-    client->cli->close(client->cli);
-    //release client object memory
-    swClient_free(client->cli);
-    efree(client->cli);
+    // close the connection
+    client->cli->close();
+    // release client object memory
+    client->cli->destroy();
     client->cli = NULL;
     client->connected = 0;
 }
@@ -456,7 +455,7 @@ int mysql_request_pack(swString *sql, swString *buffer)
     //command
     buffer->str[4] = SW_MYSQL_COM_QUERY;
     buffer->length = 5;
-    return swString_append(buffer, sql);
+    return buffer->append(*sql);
 }
 
 int mysql_prepare_pack(swString *sql, swString *buffer)
@@ -468,7 +467,7 @@ int mysql_prepare_pack(swString *sql, swString *buffer)
     //command
     buffer->str[4] = SW_MYSQL_COM_STMT_PREPARE;
     buffer->length = 5;
-    return swString_append(buffer, sql);
+    return buffer->append(*sql);
 }
 
 int mysql_get_result(mysql_connector *connector, char *buf, int len)
@@ -2377,7 +2376,7 @@ static int mysql_query(zval *zobject, mysql_client *client, swString *sql, zval 
     if (sw_reactor()->write(sw_reactor(), client->cli->socket, mysql_request_buffer->str, mysql_request_buffer->length) < 0)
     {
         //connection is closed
-        if (swSocket_error(errno) == SW_CLOSE)
+        if (client->cli->socket->catch_error(errno) == SW_CLOSE)
         {
             zend_update_property_bool(swoole_mysql_ce, zobject, ZEND_STRL("connected"), 0);
             zend_update_property_long(swoole_mysql_ce, zobject, ZEND_STRL("errno"), 2013);
@@ -2466,7 +2465,7 @@ static PHP_METHOD(swoole_mysql, connect)
     zend_string *str_password = NULL;
     zend_string *str_database = NULL;
     zend_string *str_charset = NULL;
-    zend_bool _retval = SW_TRUE;
+    zend_bool _retval = true;
 
     int ret = 0;
     swClient *cli = NULL;
@@ -2501,7 +2500,7 @@ static PHP_METHOD(swoole_mysql, connect)
     else
     {
         zend_throw_exception(swoole_mysql_exception_ce, "USER parameter is required.", 11);
-        _retval = SW_FALSE;
+        _retval = false;
         goto _return;
     }
     if (php_swoole_array_get_value(_ht, "password", value))
@@ -2513,7 +2512,7 @@ static PHP_METHOD(swoole_mysql, connect)
     else
     {
         zend_throw_exception(swoole_mysql_exception_ce, "PASSWORD parameter is required.", 11);
-        _retval = SW_FALSE;
+        _retval = false;
         goto _return;
     }
     if (php_swoole_array_get_value(_ht, "database", value))
@@ -2525,7 +2524,7 @@ static PHP_METHOD(swoole_mysql, connect)
     else
     {
         zend_throw_exception(swoole_mysql_exception_ce, "DATABASE parameter is required.", 11);
-        _retval = SW_FALSE;
+        _retval = false;
         goto _return;
     }
     if (php_swoole_array_get_value(_ht, "timeout", value))
@@ -2544,7 +2543,7 @@ static PHP_METHOD(swoole_mysql, connect)
         {
             snprintf(buf, sizeof(buf), "unknown charset [%s].", ZSTR_VAL(str_charset));
             zend_throw_exception(swoole_mysql_exception_ce, buf, 11);
-            _retval = SW_FALSE;
+            _retval = false;
             goto _return;
         }
     }
@@ -2564,8 +2563,6 @@ static PHP_METHOD(swoole_mysql, connect)
         connector->fetch_mode = zval_is_true(value);
     }
 
-    cli = (swClient *) emalloc(sizeof(swClient));
-
     if (strncasecmp(connector->host, ZEND_STRL("unix:/")) == 0)
     {
         connector->host = connector->host + 5;
@@ -2579,10 +2576,12 @@ static PHP_METHOD(swoole_mysql, connect)
 
     php_swoole_check_reactor();
     //create socket
-    if (swClient_create(cli, type, 1) < 0)
+    cli = new swClient(type, true);
+    if (cli->socket == nullptr)
     {
+        delete cli;
         zend_throw_exception(swoole_mysql_exception_ce, "swClient_create failed.", 1);
-        _retval = SW_FALSE;
+        _retval = false;
         goto _return;
     }
     //tcp nodelay
@@ -2602,7 +2601,7 @@ static PHP_METHOD(swoole_mysql, connect)
 
     zend_update_property(swoole_mysql_ce, ZEND_THIS, ZEND_STRL("onConnect"), callback);
     zend_update_property(swoole_mysql_ce, ZEND_THIS, ZEND_STRL("serverInfo"), server_info);
-    zend_update_property_long(swoole_mysql_ce, ZEND_THIS, ZEND_STRL("sock"), client->cli->socket->fd);
+    zend_update_property_long(swoole_mysql_ce, ZEND_THIS, ZEND_STRL("sock"), cli->socket->fd);
 
     client->cli = cli;
     cli->object = client;
@@ -2621,7 +2620,7 @@ static PHP_METHOD(swoole_mysql, connect)
     {
         snprintf(buf, sizeof(buf), "connect to mysql server[%s:%ld] failed.", connector->host, connector->port);
         zend_throw_exception(swoole_mysql_exception_ce, buf, 2);
-        _retval = SW_FALSE;
+        _retval = false;
     }
     _return:
     if (str_host)
@@ -2836,8 +2835,9 @@ static PHP_METHOD(swoole_mysql, close)
     int ret = 0;
     if (sw_unlikely(SWOOLE_G(req_status) != PHP_SWOOLE_CALL_USER_SHUTDOWNFUNC_BEGIN))
     {
-        ret = cli->close(cli);
+        ret = cli->close();
     }
+    cli->object = nullptr;
     zend_update_property_bool(swoole_mysql_ce, ZEND_THIS, ZEND_STRL("connected"), 0);
     SW_CHECK_RETURN(ret);
 }
@@ -3024,6 +3024,8 @@ static int swoole_mysql_onResponse(mysql_client *client, const char *data, ssize
     args[0] = *zobject;
     args[1] = *result;
     callback = client->callback;
+    swClient *cli = client->cli;
+
     if (sw_call_user_function_ex(EG(function_table), NULL, callback, NULL, 2, args, 0, NULL) != SUCCESS)
     {
         php_swoole_fatal_error(E_WARNING, "swoole_async_mysql callback[2] handler error.");
@@ -3038,12 +3040,12 @@ static int swoole_mysql_onResponse(mysql_client *client, const char *data, ssize
     }
     //free callback object
     sw_zval_free(callback);
-    if (client->cli)
+    if (cli->object && client->cli)
     {
         //clear buffer
         swString_clear(client->cli->buffer);
+        bzero(&client->response, sizeof(client->response));
     }
-    bzero(&client->response, sizeof(client->response));
     return SW_OK;
 }
 

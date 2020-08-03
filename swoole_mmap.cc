@@ -14,7 +14,7 @@
   +----------------------------------------------------------------------+
 */
 
-#include "ext/swoole/php_swoole.h"
+#include "php_swoole_async.h"
 #include "ext/swoole/include/swoole_memory.h"
 #include <sys/mman.h>
 

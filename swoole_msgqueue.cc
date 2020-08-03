@@ -157,8 +157,8 @@ static PHP_METHOD(swoole_msgqueue, setBlocking)
 static PHP_METHOD(swoole_msgqueue, stats)
 {
     swMsgQueue *queue = (swMsgQueue *) swoole_get_object(ZEND_THIS);
-    int queue_num = -1;
-    int queue_bytes = -1;
+    size_t queue_num = -1;
+    size_t queue_bytes = -1;
     if (swMsgQueue_stat(queue, &queue_num, &queue_bytes) == 0)
     {
         array_init(return_value);
