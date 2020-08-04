@@ -480,6 +480,12 @@ enum swMySQL_packet_type
 
 #define MYSQL_RESPONSE_BUFFER  (client->cmd == SW_MYSQL_COM_STMT_EXECUTE ? client->statement->buffer : client->cli->buffer)
 
+enum class mysql_opcode {
+    ERROR = -1,
+    OK = 0,
+    WAIT = 1,
+};
+
 int mysql_get_result(mysql_connector *connector, char *buf, int len);
 char mysql_get_charset(const char *name);
 int mysql_handshake(mysql_connector *connector, char *buf, int len);
@@ -488,7 +494,7 @@ int mysql_parse_rsa(mysql_connector *connector, char *buf, int len);
 int mysql_auth_switch(mysql_connector *connector, char *buf, int len);
 int mysql_request_pack(swString *sql, swString *buffer);
 int mysql_prepare_pack(swString *sql, swString *buffer);
-int mysql_response(mysql_client *client);
+mysql_opcode mysql_response(mysql_client *client);
 int mysql_is_over(mysql_client *client);
 
 #ifdef SW_MYSQL_DEBUG
