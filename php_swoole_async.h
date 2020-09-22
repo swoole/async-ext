@@ -25,7 +25,7 @@
 
 #include "ext/swoole/php_swoole.h"
 #include "ext/swoole/include/swoole_config.h"
-#include "ext/swoole/include/client.h"
+#include "ext/swoole/include/swoole_client.h"
 #include "ext/swoole/include/swoole_api.h"
 
 #define PHP_SWOOLE_EXT_ASYNC_VERSION     "4.5.3"

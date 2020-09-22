@@ -16,9 +16,9 @@
 
 #include "php_swoole_async.h"
 #include "ext/swoole/php_swoole_cxx.h"
-#include "ext/swoole/swoole_client.h"
-#include "ext/swoole/include/proxy.h"
-#include "mqtt.h"
+#include "ext/swoole/php_swoole_client.h"
+#include "ext/swoole/include/swoole_proxy.h"
+#include "ext/swoole/include/swoole_mqtt.h"
 
 #include <string>
 
@@ -822,7 +822,7 @@ static PHP_METHOD(swoole_async_client, getSocket)
         php_swoole_fatal_error(E_WARNING, "the 'getSocket' method can't be used on persistent connection");
         RETURN_FALSE;
     }
-    php_socket *socket_object = swoole_convert_to_socket(cli->socket->fd);
+    php_socket *socket_object = php_swoole_convert_to_socket(cli->socket->fd);
     if (!socket_object)
     {
         RETURN_FALSE;

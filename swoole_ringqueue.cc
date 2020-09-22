@@ -17,7 +17,37 @@
  */
 
 #include "php_swoole_async.h"
-#include "ext/swoole/include/ring_queue.h"
+#include "swoole_memory.h"
+#include "swoole_log.h"
+
+struct swRingQueue {
+    int head;
+    int tail;
+    /**
+     * empty or full
+     */
+    int tag;
+    int size;
+    void **data;
+};
+
+int swRingQueue_init(swRingQueue *queue, int buffer_size);
+int swRingQueue_push(swRingQueue *queue, void *);
+int swRingQueue_pop(swRingQueue *queue, void **);
+void swRingQueue_free(swRingQueue *queue);
+
+static inline int swRingQueue_count(swRingQueue *queue) {
+    if (queue->tail > queue->head) {
+        return queue->tail - queue->head;
+    } else if (queue->head == queue->tail) {
+        return queue->tag == 1 ? queue->size : 0;
+    } else {
+        return queue->tail + queue->size - queue->head;
+    }
+}
+
+#define swRingQueue_empty(q) ((q->head == q->tail) && (q->tag == 0))
+#define swRingQueue_full(q) ((q->head == q->tail) && (q->tag == 1))
 
 static PHP_METHOD(swoole_ringqueue, __construct);
 static PHP_METHOD(swoole_ringqueue, __destruct);
@@ -59,6 +89,51 @@ void swoole_ringqueue_init(int module_number)
     SW_SET_CLASS_SERIALIZABLE(swoole_ringqueue, zend_class_serialize_deny, zend_class_unserialize_deny);
     SW_SET_CLASS_CLONEABLE(swoole_ringqueue, sw_zend_class_clone_deny);
     SW_SET_CLASS_UNSET_PROPERTY_HANDLER(swoole_ringqueue, sw_zend_class_unset_property_deny);
+}
+
+int swRingQueue_init(swRingQueue *queue, int buffer_size) {
+    queue->data = (void **) sw_calloc(buffer_size, sizeof(void *));
+    if (queue->data == nullptr) {
+        swWarn("malloc failed");
+        return -1;
+    }
+    queue->size = buffer_size;
+    queue->head = 0;
+    queue->tail = 0;
+    queue->tag = 0;
+    return 0;
+}
+
+void swRingQueue_free(swRingQueue *queue) {
+    sw_free(queue->data);
+}
+
+int swRingQueue_push(swRingQueue *queue, void *push_data) {
+    if (swRingQueue_full(queue)) {
+        return SW_ERR;
+    }
+
+    queue->data[queue->tail] = push_data;
+    queue->tail = (queue->tail + 1) % queue->size;
+
+    if (queue->tail == queue->head) {
+        queue->tag = 1;
+    }
+    return SW_OK;
+}
+
+int swRingQueue_pop(swRingQueue *queue, void **pop_data) {
+    if (swRingQueue_empty(queue)) {
+        return SW_ERR;
+    }
+
+    *pop_data = queue->data[queue->head];
+    queue->head = (queue->head + 1) % queue->size;
+
+    if (queue->tail == queue->head) {
+        queue->tag = 0;
+    }
+    return SW_OK;
 }
 
 static PHP_METHOD(swoole_ringqueue, __construct)
