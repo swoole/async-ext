@@ -1,0 +1,31 @@
+name: ext-swoole_async
+
+on: [push, pull_request]
+
+jobs:
+  container-job:
+    runs-on: ubuntu-latest
+    container: phpswoole/swoole:latest-dev
+#    services:
+#      postgres:
+#        image: postgres
+#        env:
+#          POSTGRES_PASSWORD: postgres
+#        ports:
+#            - 5432:5432
+    steps:
+    - uses: actions/checkout@v1
+    - name: build
+      run: phpize &&
+        ./configure &&
+        make -j$(sysctl -n hw.ncpu) &&
+        make install &&
+        docker-php-ext-enable swoole_async &&
+        php --ri swoole_async
+#    - name: composer
+#      run: composer update
+#    - name: tests
+#      run: php vendor/bin/phpunit
+#      env:
+#        POSTGRES_HOST: postgres
+#        POSTGRES_PORT: 5432
