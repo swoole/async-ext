@@ -18,7 +18,7 @@
 #define SWOOLE_HTTP_CLIENT_ASYNC_H_
 
 #include "swoole_http_async.h"
-#include "ext/swoole/include/websocket.h"
+#include "ext/swoole/include/swoole_websocket.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -88,19 +88,19 @@ static sw_inline int http_client_check_data(zval *data)
     return SW_OK;
 }
 
-static sw_inline void http_client_swString_append_headers(swString* swStr, const char* key, size_t key_len, const char* data, size_t data_len)
+static sw_inline void http_client_append_headers(swString* buf, const char* key, size_t key_len, const char* data, size_t data_len)
 {
-    swString_append_ptr(swStr, (char *)key, key_len);
-    swString_append_ptr(swStr, (char *)ZEND_STRL(": "));
-    swString_append_ptr(swStr, (char *)data, data_len);
-    swString_append_ptr(swStr, (char *)ZEND_STRL("\r\n"));
+    buf->append(key, key_len);
+    buf->append(ZEND_STRL(": "));
+    buf->append(data, data_len);
+    buf->append(ZEND_STRL("\r\n"));
 }
 
 static sw_inline void http_client_append_content_length(swString* buf, int length)
 {
     char content_length_str[32];
     int n = snprintf(content_length_str, sizeof(content_length_str), "Content-Length: %d\r\n\r\n", length);
-    swString_append_ptr(buf, content_length_str, n);
+    buf->append(content_length_str, n);
 }
 
 #ifdef SW_HAVE_ZLIB

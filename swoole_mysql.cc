@@ -18,7 +18,7 @@
 
 #include "swoole_mysql_async.h"
 
-#include "ext/swoole/include/client.h"
+#include "ext/swoole/include/swoole_client.h"
 // see mysqlnd 'L64' macro redefined
 #undef L64
 #include "ext/hash/php_hash.h"
@@ -2701,10 +2701,9 @@ static PHP_METHOD(swoole_mysql, begin)
         RETURN_FALSE;
     }
 
-    swString sql;
-    bzero(&sql, sizeof(sql));
-    swString_append_ptr(&sql, ZEND_STRL("START TRANSACTION"));
-    if (mysql_query(ZEND_THIS, client, &sql, callback) < 0)
+    SwooleTG.buffer_stack->clear();
+    SwooleTG.buffer_stack->append(ZEND_STRL("START TRANSACTION"));
+    if (mysql_query(ZEND_THIS, client, SwooleTG.buffer_stack, callback) < 0)
     {
         RETURN_FALSE;
     }
@@ -2740,10 +2739,9 @@ static PHP_METHOD(swoole_mysql, commit)
         RETURN_FALSE;
     }
 
-    swString sql;
-    bzero(&sql, sizeof(sql));
-    swString_append_ptr(&sql, ZEND_STRL("COMMIT"));
-    if (mysql_query(ZEND_THIS, client, &sql, callback) < 0)
+    SwooleTG.buffer_stack->clear();
+    SwooleTG.buffer_stack->append(ZEND_STRL("COMMIT"));
+    if (mysql_query(ZEND_THIS, client, SwooleTG.buffer_stack, callback) < 0)
     {
         RETURN_FALSE;
     }
@@ -2780,10 +2778,9 @@ static PHP_METHOD(swoole_mysql, rollback)
         RETURN_FALSE;
     }
 
-    swString sql;
-    bzero(&sql, sizeof(sql));
-    swString_append_ptr(&sql, ZEND_STRL("ROLLBACK"));
-    if (mysql_query(ZEND_THIS, client, &sql, callback) < 0)
+    SwooleTG.buffer_stack->clear();
+    SwooleTG.buffer_stack->append(ZEND_STRL("ROLLBACK"));
+    if (mysql_query(ZEND_THIS, client, SwooleTG.buffer_stack, callback) < 0)
     {
         RETURN_FALSE;
     }
@@ -2924,7 +2921,7 @@ static void mysql_client_onReceive(swClient *cli, const char *data, uint32_t len
     //recv again
     if (buffer->length == buffer->size)
     {
-        if (swString_extend(buffer, buffer->size * 2) < 0)
+        if (!buffer->extend(buffer->size * 2))
         {
             php_swoole_fatal_error(E_ERROR, "malloc failed.");
         }

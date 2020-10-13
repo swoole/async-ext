@@ -24,14 +24,16 @@
 #endif
 
 #include "ext/swoole/php_swoole.h"
+#include "ext/swoole/php_swoole_cxx.h"
 #include "ext/swoole/include/swoole_config.h"
+#include "ext/swoole/include/swoole_async.h"
 #include "ext/swoole/include/swoole_client.h"
 #include "ext/swoole/include/swoole_api.h"
 
-#define PHP_SWOOLE_EXT_ASYNC_VERSION     "4.5.3"
-#define PHP_SWOOLE_EXT_ASYNC_VERSION_ID  40503
+#define PHP_SWOOLE_EXT_ASYNC_VERSION     "4.5.5"
+#define PHP_SWOOLE_EXT_ASYNC_VERSION_ID  40505
 
-#if SWOOLE_API_VERSION_ID < 0x202006a || SWOOLE_VERSION_ID < 40503
+#if SWOOLE_API_VERSION_ID < 0x202009a
 #error "Ext version does not match the Swoole version"
 #endif
 
@@ -39,6 +41,8 @@
 #define SW_MYSQL_CONNECT_TIMEOUT         1.0
 #define SW_REDIS_CONNECT_TIMEOUT         1.0
 #endif
+
+#define SW_ZEND_REGISTER_RESOURCE(return_value, result, le_result)  ZVAL_RES(return_value,zend_register_resource(result, le_result))
 
 static sw_inline bool php_swoole_is_callable(zval *callback)
 {

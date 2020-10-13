@@ -15,7 +15,7 @@
 */
 
 #include "php_swoole_async.h"
-#include "ext/swoole/include/msg_queue.h"
+#include "ext/swoole/include/swoole_msg_queue.h"
 
 static PHP_METHOD(swoole_msgqueue, __construct);
 static PHP_METHOD(swoole_msgqueue, __destruct);

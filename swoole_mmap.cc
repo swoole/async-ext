@@ -27,8 +27,8 @@ typedef struct
     void *ptr;
 } swMmapFile;
 
-static ssize_t mmap_stream_write(php_stream * stream, const char *buffer, size_t length);
-static ssize_t mmap_stream_read(php_stream *stream, char *buffer, size_t length);
+static size_t mmap_stream_write(php_stream * stream, const char *buffer, size_t length);
+static size_t mmap_stream_read(php_stream *stream, char *buffer, size_t length);
 static int mmap_stream_flush(php_stream *stream);
 static int mmap_stream_seek(php_stream *stream, zend_off_t offset, int whence, zend_off_t *newoffset);
 static int mmap_stream_close(php_stream *stream, int close_handle);
@@ -62,7 +62,7 @@ php_stream_ops mmap_ops =
     NULL
 };
 
-static ssize_t mmap_stream_write(php_stream * stream, const char *buffer, size_t length)
+static size_t mmap_stream_write(php_stream * stream, const char *buffer, size_t length)
 {
     swMmapFile *res = (swMmapFile *) stream->abstract;
 
@@ -76,7 +76,7 @@ static ssize_t mmap_stream_write(php_stream * stream, const char *buffer, size_t
     return n_write;
 }
 
-static ssize_t mmap_stream_read(php_stream *stream, char *buffer, size_t length)
+static size_t mmap_stream_read(php_stream *stream, char *buffer, size_t length)
 {
     swMmapFile *res = (swMmapFile *) stream->abstract;
 

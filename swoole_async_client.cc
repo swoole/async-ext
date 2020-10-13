@@ -336,28 +336,6 @@ void php_swoole_async_client_free(zval *zobject, swClient *cli)
         swoole_timer_del(cli->timer);
         cli->timer = NULL;
     }
-    //socks5 proxy config
-    if (cli->socks5_proxy) {
-        efree((void* )cli->socks5_proxy->host);
-        if (cli->socks5_proxy->username) {
-            efree((void* )cli->socks5_proxy->username);
-        }
-        if (cli->socks5_proxy->password) {
-            efree((void* )cli->socks5_proxy->password);
-        }
-        efree(cli->socks5_proxy);
-    }
-    //http proxy config
-    if (cli->http_proxy) {
-        efree((void* ) cli->http_proxy->proxy_host);
-        if (cli->http_proxy->user) {
-            efree((void* )cli->http_proxy->user);
-        }
-        if (cli->http_proxy->password) {
-            efree((void* )cli->http_proxy->password);
-        }
-        efree(cli->http_proxy);
-    }
     if (cli->protocol.private_data) {
         sw_zend_fci_cache_discard((zend_fcall_info_cache *) cli->protocol.private_data);
         efree(cli->protocol.private_data);
@@ -526,7 +504,7 @@ static PHP_METHOD(swoole_async_client, connect)
     }
     swoole_set_object(ZEND_THIS, cli);
 
-    if (cli->type == SW_SOCK_TCP || cli->type == SW_SOCK_TCP6)
+    if (cli->socket->socket_type == SW_SOCK_TCP || cli->socket->socket_type == SW_SOCK_TCP6)
     {
         //for tcp: nonblock
         //for udp: have udp connect
@@ -556,7 +534,7 @@ static PHP_METHOD(swoole_async_client, connect)
         php_swoole_fatal_error(E_ERROR, "no 'onReceive' callback function");
         RETURN_FALSE;
     }
-    if (swSocket::is_stream(cli->type))
+    if (cli->socket->is_stream())
     {
         if (!cb->cache_onConnect.function_handler)
         {
@@ -727,7 +705,7 @@ static PHP_METHOD(swoole_async_client, sendfile)
         RETURN_FALSE;
     }
     //only stream socket can sendfile
-    if (!(cli->type == SW_SOCK_TCP || cli->type == SW_SOCK_TCP6 || cli->type == SW_SOCK_UNIX_STREAM))
+    if (!(cli->socket->is_stream()))
     {
         php_swoole_error(E_WARNING, "dgram socket cannot use sendfile");
         RETURN_FALSE;
@@ -770,7 +748,7 @@ static PHP_METHOD(swoole_async_client, getsockname)
         RETURN_FALSE;
     }
 
-    if (cli->type == SW_SOCK_UNIX_STREAM || cli->type == SW_SOCK_UNIX_DGRAM)
+    if (cli->socket->is_local())
     {
         php_swoole_fatal_error(E_WARNING, "getsockname() only support AF_INET family socket");
         RETURN_FALSE;
@@ -784,7 +762,7 @@ static PHP_METHOD(swoole_async_client, getsockname)
     }
 
     array_init(return_value);
-    if (cli->type == SW_SOCK_UDP6 || cli->type == SW_SOCK_TCP6)
+    if (cli->socket->is_inet6())
     {
         add_assoc_long(return_value, "port", ntohs(cli->socket->info.addr.inet_v6.sin6_port));
         char tmp[INET6_ADDRSTRLEN];
@@ -842,13 +820,13 @@ static PHP_METHOD(swoole_async_client, getpeername)
         RETURN_FALSE;
     }
 
-    if (cli->type == SW_SOCK_UDP)
+    if (cli->socket->socket_type == SW_SOCK_UDP)
     {
         array_init(return_value);
         add_assoc_long(return_value, "port", ntohs(cli->remote_addr.addr.inet_v4.sin_port));
         add_assoc_string(return_value, "host", inet_ntoa(cli->remote_addr.addr.inet_v4.sin_addr));
     }
-    else if (cli->type == SW_SOCK_UDP6)
+    else if (cli->socket->socket_type == SW_SOCK_UDP6)
     {
         array_init(return_value);
         add_assoc_long(return_value, "port", ntohs(cli->remote_addr.addr.inet_v6.sin6_port));
@@ -863,7 +841,7 @@ static PHP_METHOD(swoole_async_client, getpeername)
             php_swoole_fatal_error(E_WARNING, "inet_ntop() failed");
         }
     }
-    else if (cli->type == SW_SOCK_UNIX_DGRAM)
+    else if (cli->socket->socket_type == SW_SOCK_UNIX_DGRAM)
     {
         add_assoc_string(return_value, "host", cli->remote_addr.addr.un.sun_path);
     }
@@ -1002,7 +980,7 @@ static PHP_METHOD(swoole_async_client, enableSSL)
     {
         RETURN_FALSE;
     }
-    if (cli->type != SW_SOCK_TCP && cli->type != SW_SOCK_TCP6)
+    if (cli->socket->socket_type != SW_SOCK_TCP && cli->socket->socket_type != SW_SOCK_TCP6)
     {
         php_swoole_fatal_error(E_WARNING, "cannot use enableSSL");
         RETURN_FALSE;

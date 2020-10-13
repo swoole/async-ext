@@ -17,7 +17,7 @@
  */
 
 #include "php_swoole_async.h"
-#include "ext/swoole/include/channel.h"
+#include "ext/swoole/include/swoole_channel.h"
 
 static PHP_METHOD(swoole_channel, __construct);
 static PHP_METHOD(swoole_channel, __destruct);

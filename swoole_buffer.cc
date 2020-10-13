@@ -374,7 +374,7 @@ static PHP_METHOD(swoole_buffer, expand)
         RETURN_FALSE;
     }
 
-    if (swString_extend(buffer, size) == SW_OK)
+    if (buffer->extend(size))
     {
         zend_update_property_long(swoole_buffer_ce, ZEND_THIS, ZEND_STRL("capacity"), size);
         RETURN_TRUE;

@@ -16,9 +16,9 @@
 */
 
 #include "php_swoole_async.h"
-#include "ext/swoole/swoole_client.h"
+#include "ext/swoole/php_swoole_client.h"
 #include "swoole_http_client_async.h"
-#include "mime_type.h"
+#include "swoole_mime_type.h"
 
 #ifndef SW_HTTP_CLIENT_BOUNDARY_TOTAL_SIZE
 #define SW_HTTP_CLIENT_BOUNDARY_TOTAL_SIZE   39
@@ -27,6 +27,8 @@
 #define SW_HTTP_FORM_FILE_DATA_FMT           "--%.*s\r\nContent-Disposition: form-data; name=\"%.*s\"; filename=\"%.*s\"\r\nContent-Type: %.*s\r\n\r\n"
 #define SW_HTTP_FORM_FILE_DATA_FMT_LEN       16
 #endif
+
+using swoole::TimerNode;
 
 typedef struct
 {
@@ -76,7 +78,7 @@ typedef struct
     char* uri;
     size_t uri_len;
 
-    swTimer_node *timer;
+    TimerNode *timer;
 
     char *tmp_header_field_name;
     int tmp_header_field_name_len;
@@ -116,7 +118,7 @@ static void http_client_onReceive(swClient *cli, const char *data, uint32_t leng
 static void http_client_onConnect(swClient *cli);
 static void http_client_onClose(swClient *cli);
 static void http_client_onError(swClient *cli);
-static void http_client_onRequestTimeout(swTimer *timer, swTimer_node *tnode);
+static void http_client_onRequestTimeout(swTimer *timer, TimerNode *tnode);
 static void http_client_onResponseException(zval *zobject);
 static int http_client_onMessage(swProtocol *proto, swSocket *conn, const char *data, uint32_t length);
 
@@ -467,12 +469,12 @@ static int http_client_execute(zval *zobject, char *uri, size_t uri_len, zval *c
                 php_swoole_fatal_error(E_WARNING, "http proxy must set Host");
                 return SW_ERR;
             }
-            if (http->cli->http_proxy->password)
+            if (!http->cli->http_proxy->password.empty())
             {
                 char _buf1[128];
                 char _buf2[256];
-                int _n1 = sw_snprintf(_buf1, sizeof(_buf1), "%*s:%*s", http->cli->http_proxy->l_user,
-                        http->cli->http_proxy->user, http->cli->http_proxy->l_password,
+                int _n1 = sw_snprintf(_buf1, sizeof(_buf1), "%*s:%*s", http->cli->http_proxy->username.length(),
+                        http->cli->http_proxy->username.c_str(), http->cli->http_proxy->password.length(),
                         http->cli->http_proxy->password);
                 zend_string *str = php_base64_encode((const unsigned char *) _buf1, _n1);
                 int _n2 = sw_snprintf(_buf2, sizeof(_buf2), "Basic %*s", (int)ZSTR_LEN(str), ZSTR_VAL(str));
@@ -676,7 +678,7 @@ static void http_client_onError(swClient *cli)
     zval_ptr_dtor(zobject);
 }
 
-static void http_client_onRequestTimeout(swTimer *timer, swTimer_node *tnode)
+static void http_client_onRequestTimeout(swTimer *timer, TimerNode *tnode)
 {
     swClient *cli = (swClient *) tnode->data;
     zval *zobject = (zval *) cli->object;
@@ -933,9 +935,9 @@ static int http_client_send_http_request(zval *zobject)
     zval *value = NULL;
 
     swString_clear(http_client_buffer);
-    swString_append_ptr(http_client_buffer, hcc->request_method, strlen(hcc->request_method));
+    http_client_buffer->append(hcc->request_method, strlen(hcc->request_method));
     hcc->request_method = NULL;
-    swString_append_ptr(http_client_buffer, ZEND_STRL(" "));
+    http_client_buffer->append(ZEND_STRL(" "));
 #ifdef SW_USE_OPENSSL
     if (http->cli->http_proxy && !http->cli->open_ssl)
 #else
@@ -950,8 +952,8 @@ static int http_client_send_http_request(zval *zobject)
         efree(http->uri);
         http->uri = addr;
     }
-    swString_append_ptr (http_client_buffer, http->uri, http->uri_len);
-    swString_append_ptr(http_client_buffer, ZEND_STRL(" HTTP/1.1\r\n"));
+    http_client_buffer->append(http->uri, http->uri_len);
+    http_client_buffer->append(ZEND_STRL(" HTTP/1.1\r\n"));
 
     if (zsend_header && Z_TYPE_P(zsend_header) == IS_ARRAY)
     {
@@ -959,11 +961,11 @@ static int http_client_send_http_request(zval *zobject)
         // See: http://tools.ietf.org/html/rfc7230#section-5.4
         if ((value = zend_hash_str_find(Z_ARRVAL_P(zsend_header), ZEND_STRL("Host"))) || (value = zend_hash_str_find(Z_ARRVAL_P(zsend_header), ZEND_STRL("host"))))
         {
-            http_client_swString_append_headers(http_client_buffer, ZEND_STRL("Host"), Z_STRVAL_P(value), Z_STRLEN_P(value));
+            http_client_append_headers(http_client_buffer, ZEND_STRL("Host"), Z_STRVAL_P(value), Z_STRLEN_P(value));
         }
         else
         {
-            http_client_swString_append_headers(http_client_buffer, ZEND_STRL("Host"), http->host, http->host_len);
+            http_client_append_headers(http_client_buffer, ZEND_STRL("Host"), http->host, http->host_len);
         }
 
         SW_HASHTABLE_FOREACH_START2(Z_ARRVAL_P(zsend_header), key, keylen, keytype, value)
@@ -988,37 +990,37 @@ static int http_client_send_http_request(zval *zobject)
             zend_string *str = zval_get_string(value);
             if (ZSTR_LEN(str) > 0)
             {
-                http_client_swString_append_headers(http_client_buffer, key, keylen, ZSTR_VAL(str), ZSTR_LEN(str));
+                http_client_append_headers(http_client_buffer, key, keylen, ZSTR_VAL(str), ZSTR_LEN(str));
             }
             zend_string_release(str);
         SW_HASHTABLE_FOREACH_END();
     }
     else
     {
-        http_client_swString_append_headers(http_client_buffer, ZEND_STRL("Host"), http->host, http->host_len);
+        http_client_append_headers(http_client_buffer, ZEND_STRL("Host"), http->host, http->host_len);
     }
     if (!(header_flag & HTTP_HEADER_CONNECTION))
     {
         if (http->keep_alive)
         {
-            http_client_swString_append_headers(http_client_buffer, ZEND_STRL("Connection"), ZEND_STRL("keep-alive"));
+            http_client_append_headers(http_client_buffer, ZEND_STRL("Connection"), ZEND_STRL("keep-alive"));
         }
         else
         {
-            http_client_swString_append_headers(http_client_buffer, ZEND_STRL("Connection"), ZEND_STRL("closed"));
+            http_client_append_headers(http_client_buffer, ZEND_STRL("Connection"), ZEND_STRL("closed"));
         }
     }
 #ifdef SW_HAVE_ZLIB
     if (!(header_flag & HTTP_HEADER_ACCEPT_ENCODING))
     {
-        http_client_swString_append_headers(http_client_buffer, ZEND_STRL("Accept-Encoding"), ZEND_STRL("gzip"));
+        http_client_append_headers(http_client_buffer, ZEND_STRL("Accept-Encoding"), ZEND_STRL("gzip"));
     }
 #endif
 
     zval *zcookies = sw_zend_read_property(swoole_http_client_ce, zobject, ZEND_STRL("cookies"), 1);
     if (zcookies && Z_TYPE_P(zcookies) == IS_ARRAY)
     {
-        swString_append_ptr(http_client_buffer, ZEND_STRL("Cookie: "));
+        http_client_buffer->append(ZEND_STRL("Cookie: "));
         int n_cookie = php_swoole_array_length(zcookies);
         int i = 0;
         char *encoded_value;
@@ -1035,23 +1037,23 @@ static int http_client_send_http_request(zval *zobject)
                 zend_string_release(str);
                 continue;
             }
-            swString_append_ptr(http_client_buffer, key, keylen);
-            swString_append_ptr(http_client_buffer, "=", 1);
+            http_client_buffer->append(key, keylen);
+            http_client_buffer->append("=", 1);
 
             int encoded_value_len;
             encoded_value = php_swoole_url_encode(ZSTR_VAL(str), ZSTR_LEN(str), &encoded_value_len);
             if (encoded_value)
             {
-                swString_append_ptr(http_client_buffer, encoded_value, encoded_value_len);
+                http_client_buffer->append(encoded_value, encoded_value_len);
                 efree(encoded_value);
             }
             if (i < n_cookie)
             {
-                swString_append_ptr(http_client_buffer, "; ", 2);
+                http_client_buffer->append("; ", 2);
             }
             zend_string_release(str);
         SW_HASHTABLE_FOREACH_END();
-        swString_append_ptr(http_client_buffer, ZEND_STRL("\r\n"));
+        http_client_buffer->append(ZEND_STRL("\r\n"));
     }
 
     //form-data
@@ -1068,7 +1070,7 @@ static int http_client_send_http_request(zval *zobject)
         n = sw_snprintf(header_buf, sizeof(header_buf), "Content-Type: multipart/form-data; boundary=%*s\r\n",
                 (int)(sizeof(boundary_str) - 1), boundary_str);
 
-        swString_append_ptr(http_client_buffer, header_buf, n);
+        http_client_buffer->append(header_buf, n);
 
         int content_length = 0;
 
@@ -1135,9 +1137,9 @@ static int http_client_send_http_request(zval *zobject)
                 zend_string *str = zval_get_string(value);
                 n = sw_snprintf(header_buf, sizeof(header_buf), SW_HTTP_FORM_RAW_DATA_FMT, (int)(sizeof(boundary_str) - 1),
                         boundary_str, keylen, key);
-                swString_append_ptr(http_client_buffer, header_buf, n);
-                swString_append_ptr(http_client_buffer, ZSTR_VAL(str), ZSTR_LEN(str));
-                swString_append_ptr(http_client_buffer, ZEND_STRL("\r\n"));
+                http_client_buffer->append(header_buf, n);
+                http_client_buffer->append(ZSTR_VAL(str), ZSTR_LEN(str));
+                http_client_buffer->append(ZEND_STRL("\r\n"));
                 zend_string_release(str);
             SW_HASHTABLE_FOREACH_END();
 
@@ -1213,7 +1215,7 @@ static int http_client_send_http_request(zval *zobject)
         if (Z_TYPE_P(zpost_data) == IS_ARRAY)
         {
             size_t len;
-            http_client_swString_append_headers(http_client_buffer, ZEND_STRL("Content-Type"), ZEND_STRL("application/x-www-form-urlencoded"));
+            http_client_append_headers(http_client_buffer, ZEND_STRL("Content-Type"), ZEND_STRL("application/x-www-form-urlencoded"));
             if (php_swoole_array_length(zpost_data) > 0) //if it's an empty array, http build will fail
             {
                 smart_str formstr_s = { 0 };
@@ -1224,7 +1226,7 @@ static int http_client_send_http_request(zval *zobject)
                     return SW_ERR;
                 }
                 http_client_append_content_length(http_client_buffer, len);
-                swString_append_ptr(http_client_buffer, formstr, len);
+                http_client_buffer->append(formstr, len);
                 smart_str_free(&formstr_s);
             }
             else
@@ -1272,7 +1274,7 @@ static int http_client_send_http_request(zval *zobject)
         }
         else
         {
-            swString_append_ptr(http_client_buffer, ZEND_STRL("\r\n"));
+            http_client_buffer->append(ZEND_STRL("\r\n"));
         }
         if ((ret = http->cli->send(http->cli, http_client_buffer->str, http_client_buffer->length, 0)) < 0)
         {
@@ -1923,7 +1925,7 @@ static int php_swoole_zlib_uncompress(z_stream *stream, swString *buffer, char *
         {
             if (buffer->length + 4096 >= buffer->size)
             {
-                if (swString_extend(buffer, buffer->size * 2) < 0)
+                if (!buffer->extend(buffer->size * 2))
                 {
                     return SW_ERR;
                 }
@@ -1945,7 +1947,7 @@ static int php_swoole_zlib_uncompress(z_stream *stream, swString *buffer, char *
 static int http_client_parser_on_body(swoole_http_parser *parser, const char *at, size_t length)
 {
     http_client* http = (http_client*) parser->data;
-    if (swString_append_ptr(http->body, at, length) < 0)
+    if (http->body->append(at, length) < 0)
     {
         return -1;
     }

@@ -268,7 +268,7 @@ typedef struct
 
     long port;
     double timeout;
-    swTimer_node *timer;
+    swoole::TimerNode timer;
 
     int capability_flags;
     int max_packet_size;
@@ -381,7 +381,7 @@ typedef struct _mysql_client
     mysql_connector connector;
     mysql_statement *statement;
 
-    swTimer_node *timer;
+    swoole::TimerNode timer;
 
     zval _object;
 

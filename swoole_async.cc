@@ -16,14 +16,19 @@
 
 #include "php_swoole_async.h"
 #include "ext/swoole/php_swoole_cxx.h"
-#include "ext/swoole/include/process_pool.h"
+#include "ext/swoole/include/swoole_process_pool.h"
 #include "php_streams.h"
 #include "php_network.h"
 #include "ext/standard/file.h"
 
+#include <sys/file.h>
+
 #include <string>
 #include <memory>
 #include <unordered_map>
+
+using swoole::TimerNode;
+using swoole::AsyncEvent;
 
 typedef struct
 {
@@ -46,7 +51,7 @@ typedef struct
     zval *callback;
     zval *domain;
     uint8_t useless;
-    swTimer_node *timer;
+    TimerNode *timer;
 } dns_request;
 
 typedef struct
@@ -136,8 +141,223 @@ static uint16_t swoole_dns_request_id = 1;
 static swClient *resolver_socket = NULL;
 static std::unordered_map<std::string, swDNS_lookup_request *> *request_map;
 
-static void aio_onFileCompleted(swoole::async::Event *event);
-static void aio_onDNSCompleted(swoole::async::Event *event);
+namespace swoole { namespace async {
+
+void handler_read(AsyncEvent *event) {
+    int ret = -1;
+    if (event->lock && flock(event->fd, LOCK_SH) < 0) {
+        swSysWarn("flock(%d, LOCK_SH) failed", event->fd);
+        event->ret = -1;
+        event->error = errno;
+        return;
+    }
+    while (1) {
+        ret = pread(event->fd, event->buf, event->nbytes, event->offset);
+        if (ret < 0 && errno == EINTR) {
+            continue;
+        }
+        break;
+    }
+    if (event->lock && flock(event->fd, LOCK_UN) < 0) {
+        swSysWarn("flock(%d, LOCK_UN) failed", event->fd);
+    }
+    if (ret < 0) {
+        event->error = errno;
+    }
+    event->ret = ret;
+}
+
+void handler_fread(AsyncEvent *event) {
+    int ret = -1;
+    if (event->lock && flock(event->fd, LOCK_SH) < 0) {
+        swSysWarn("flock(%d, LOCK_SH) failed", event->fd);
+        event->ret = -1;
+        event->error = errno;
+        return;
+    }
+    while (1) {
+        ret = read(event->fd, event->buf, event->nbytes);
+        if (ret < 0 && errno == EINTR) {
+            continue;
+        }
+        break;
+    }
+    if (event->lock && flock(event->fd, LOCK_UN) < 0) {
+        swSysWarn("flock(%d, LOCK_UN) failed", event->fd);
+    }
+    if (ret < 0) {
+        event->error = errno;
+    }
+    event->ret = ret;
+}
+
+void handler_fwrite(AsyncEvent *event) {
+    int ret = -1;
+    if (event->lock && flock(event->fd, LOCK_EX) < 0) {
+        swSysWarn("flock(%d, LOCK_EX) failed", event->fd);
+        return;
+    }
+    while (1) {
+        ret = write(event->fd, event->buf, event->nbytes);
+        if (ret < 0 && errno == EINTR) {
+            continue;
+        }
+        break;
+    }
+    if (event->flags & SW_AIO_WRITE_FSYNC) {
+        if (fsync(event->fd) < 0) {
+            swSysWarn("fsync(%d) failed", event->fd);
+        }
+    }
+    if (event->lock && flock(event->fd, LOCK_UN) < 0) {
+        swSysWarn("flock(%d, LOCK_UN) failed", event->fd);
+    }
+    if (ret < 0) {
+        event->error = errno;
+    }
+    event->ret = ret;
+}
+
+void handler_fgets(AsyncEvent *event) {
+    if (event->lock && flock(event->fd, LOCK_SH) < 0) {
+        swSysWarn("flock(%d, LOCK_SH) failed", event->fd);
+        event->ret = -1;
+        event->error = errno;
+        return;
+    }
+
+    FILE *file = (FILE *) event->req;
+    char *data = fgets((char *) event->buf, event->nbytes, file);
+    if (data == nullptr) {
+        event->ret = -1;
+        event->error = errno;
+        event->flags = SW_AIO_EOF;
+    }
+
+    if (event->lock && flock(event->fd, LOCK_UN) < 0) {
+        swSysWarn("flock(%d, LOCK_UN) failed", event->fd);
+    }
+}
+
+void handler_read_file(AsyncEvent *event) {
+    swString *data;
+    int ret = -1;
+    int fd = open((char *) event->req, O_RDONLY);
+    if (fd < 0) {
+        swSysWarn("open(%s, O_RDONLY) failed", (char *) event->req);
+        event->ret = ret;
+        event->error = errno;
+        return;
+    }
+    struct stat file_stat;
+    if (fstat(fd, &file_stat) < 0) {
+        swSysWarn("fstat(%s) failed", (char *) event->req);
+    _error:
+        close(fd);
+        event->ret = ret;
+        event->error = errno;
+        return;
+    }
+    if ((file_stat.st_mode & S_IFMT) != S_IFREG) {
+        errno = EISDIR;
+        goto _error;
+    }
+
+    /**
+     * lock
+     */
+    if (event->lock && flock(fd, LOCK_SH) < 0) {
+        swSysWarn("flock(%d, LOCK_SH) failed", event->fd);
+        goto _error;
+    }
+    /**
+     * regular file
+     */
+    if (file_stat.st_size == 0) {
+        data = swoole_sync_readfile_eof(fd);
+        if (data == nullptr) {
+            goto _error;
+        }
+    } else {
+        data = swoole::make_string(file_stat.st_size);
+        if (data == nullptr) {
+            goto _error;
+        }
+        data->length = swoole_sync_readfile(fd, data->str, file_stat.st_size);
+    }
+    event->ret = data->length;
+    event->buf = data;
+    /**
+     * unlock
+     */
+    if (event->lock && flock(fd, LOCK_UN) < 0) {
+        swSysWarn("flock(%d, LOCK_UN) failed", event->fd);
+    }
+    close(fd);
+    event->error = 0;
+}
+
+void handler_write_file(AsyncEvent *event) {
+    int ret = -1;
+    int fd = open((char *) event->req, event->flags, 0644);
+    if (fd < 0) {
+        swSysWarn("open(%s, %d) failed", (char *) event->req, event->flags);
+        event->ret = ret;
+        event->error = errno;
+        return;
+    }
+    if (event->lock && flock(fd, LOCK_EX) < 0) {
+        swSysWarn("flock(%d, LOCK_EX) failed", event->fd);
+        event->ret = ret;
+        event->error = errno;
+        close(fd);
+        return;
+    }
+    size_t written = swoole_sync_writefile(fd, event->buf, event->nbytes);
+    if (event->flags & SW_AIO_WRITE_FSYNC) {
+        if (fsync(fd) < 0) {
+            swSysWarn("fsync(%d) failed", event->fd);
+        }
+    }
+    if (event->lock && flock(fd, LOCK_UN) < 0) {
+        swSysWarn("flock(%d, LOCK_UN) failed", event->fd);
+    }
+    close(fd);
+    event->ret = written;
+    event->error = 0;
+}
+
+void handler_write(AsyncEvent *event) {
+    int ret = -1;
+    if (event->lock && flock(event->fd, LOCK_EX) < 0) {
+        swSysWarn("flock(%d, LOCK_EX) failed", event->fd);
+        return;
+    }
+    while (1) {
+        ret = pwrite(event->fd, event->buf, event->nbytes, event->offset);
+        if (ret < 0 && errno == EINTR) {
+            continue;
+        }
+        break;
+    }
+    if (event->flags & SW_AIO_WRITE_FSYNC) {
+        if (fsync(event->fd) < 0) {
+            swSysWarn("fsync(%d) failed", event->fd);
+        }
+    }
+    if (event->lock && flock(event->fd, LOCK_UN) < 0) {
+        swSysWarn("flock(%d, LOCK_UN) failed", event->fd);
+    }
+    if (ret < 0) {
+        event->error = errno;
+    }
+    event->ret = ret;
+}
+
+}}
+
+static void aio_onFileCompleted(AsyncEvent *event);
+static void aio_onDNSCompleted(AsyncEvent *event);
 static void php_swoole_dns_callback(char *domain, swDNSResolver_result *result, void *data);
 
 static void php_swoole_file_request_free(void *data);
@@ -425,7 +645,7 @@ static void php_swoole_dns_callback(const char *domain, swDNSResolver_result *re
     zval_ptr_dtor(&args[1]);
 }
 
-static void aio_onDNSCompleted(swoole::async::Event *event)
+static void aio_onDNSCompleted(AsyncEvent *event)
 {
     int64_t ret;
 
@@ -481,7 +701,7 @@ static void aio_onDNSCompleted(swoole::async::Event *event)
     }
 }
 
-static void aio_onFileCompleted(swoole::async::Event *event)
+static void aio_onFileCompleted(AsyncEvent *event)
 {
     int isEOF = false;
     int64_t ret = event->ret;
@@ -601,7 +821,7 @@ static void aio_onFileCompleted(swoole::async::Event *event)
         //continue to read
         else
         {
-            swoole::async::Event ev;
+            AsyncEvent ev;
             ev.canceled = 0;
             ev.fd = event->fd;
             ev.buf = event->buf;
@@ -713,7 +933,7 @@ PHP_FUNCTION(swoole_async_read)
     req->length = buf_size;
     req->offset = offset;
 
-    swoole::async::Event ev;
+    AsyncEvent ev;
     ev.canceled = 0;
     ev.fd = fd;
     ev.buf = fcnt;
@@ -820,7 +1040,7 @@ PHP_FUNCTION(swoole_async_write)
 
     memcpy(wt_cnt, fcnt, fcnt_len);
 
-    swoole::async::Event ev;
+    AsyncEvent ev;
     ev.canceled = 0;
     ev.fd = fd;
     ev.buf = wt_cnt;
@@ -905,7 +1125,7 @@ PHP_FUNCTION(swoole_async_readfile)
     req->length = length;
     req->offset = 0;
 
-    swoole::async::Event ev;
+    AsyncEvent ev;
     ev.canceled = 0;
     ev.fd = fd;
     ev.buf = req->content;
@@ -1004,7 +1224,7 @@ PHP_FUNCTION(swoole_async_writefile)
 
     memcpy(wt_cnt, fcnt, fcnt_len);
 
-    swoole::async::Event ev;
+    AsyncEvent ev;
     ev.canceled = 0;
     ev.fd = fd;
     ev.buf = wt_cnt;
@@ -1527,7 +1747,7 @@ PHP_FUNCTION(swoole_async_dns_lookup)
     bzero(buf, buf_size);
     memcpy(buf, Z_STRVAL_P(domain), Z_STRLEN_P(domain));
 
-    swoole::async::Event ev;
+    AsyncEvent ev;
     ev.canceled = 0;
     ev.fd = 0;
     ev.buf = buf;
@@ -1554,7 +1774,7 @@ static int process_stream_onRead(swReactor *reactor, swEvent *event)
     {
         ps->buffer->length += ret;
         if (ps->buffer->length == ps->buffer->size) {
-            swString_extend(ps->buffer, ps->buffer->size * 2);
+            ps->buffer->extend(ps->buffer->size * 2);
         }
         return SW_OK;
     }
