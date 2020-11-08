@@ -30,6 +30,9 @@
 #include <openssl/pem.h>
 #endif
 
+using swClient = swoole::network::Client;
+using swoole::String;
+
 static swString *mysql_request_buffer;
 
 static PHP_METHOD(swoole_mysql, __construct);
@@ -443,12 +446,12 @@ void swoole_mysql_init(int module_number)
     zend_declare_class_constant_long(swoole_mysql_ce, ZEND_STRL("STATE_READ_END"), SW_MYSQL_STATE_READ_END);
     zend_declare_class_constant_long(swoole_mysql_ce, ZEND_STRL("STATE_CLOSED"), SW_MYSQL_STATE_CLOSED);
 
-    mysql_request_buffer = swString_new(SW_BUFFER_SIZE_STD);
+    mysql_request_buffer = new String(SW_BUFFER_SIZE_STD);
 }
 
 int mysql_request_pack(swString *sql, swString *buffer)
 {
-    swString_clear(buffer);
+    buffer->clear();
     bzero(buffer->str, 5);
     //length
     mysql_pack_length(sql->length + 1, buffer->str);
@@ -460,7 +463,7 @@ int mysql_request_pack(swString *sql, swString *buffer)
 
 int mysql_prepare_pack(swString *sql, swString *buffer)
 {
-    swString_clear(buffer);
+    buffer->clear();
     bzero(buffer->str, 5);
     //length
     mysql_pack_length(sql->length + 1, buffer->str);
@@ -3038,7 +3041,7 @@ static int swoole_mysql_onResponse(mysql_client *client, const char *data, ssize
     if (cli->object && client->cli)
     {
         //clear buffer
-        swString_clear(client->cli->buffer);
+        client->cli->buffer->clear();
         bzero(&client->response, sizeof(client->response));
     }
     return SW_OK;
@@ -3084,7 +3087,7 @@ static int swoole_mysql_onHandShake(mysql_client *client, const char *data, ssiz
             else
             {
                 // clear for the new packet
-                swString_clear(buffer);
+                buffer->clear();
                 // mysql_handshake will return the next state flag
                 client->handshake = ret;
             }
@@ -3138,7 +3141,7 @@ static int swoole_mysql_onHandShake(mysql_client *client, const char *data, ssiz
         }
         else
         {
-            swString_clear(buffer);
+            buffer->clear();
         }
         break;
     }
@@ -3175,7 +3178,7 @@ static int swoole_mysql_onHandShake(mysql_client *client, const char *data, ssiz
         }
         else if (ret > 0)
         {
-            swString_clear(buffer);
+            buffer->clear();
             client->handshake = SW_MYSQL_HANDSHAKE_COMPLETED;
             swoole_mysql_onConnect(client);
         }

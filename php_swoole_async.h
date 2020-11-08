@@ -23,17 +23,17 @@
 #include "config.h"
 #endif
 
-#include "ext/swoole/php_swoole.h"
-#include "ext/swoole/php_swoole_cxx.h"
+#include "ext/swoole/ext-src/php_swoole.h"
+#include "ext/swoole/ext-src/php_swoole_cxx.h"
 #include "ext/swoole/include/swoole_config.h"
 #include "ext/swoole/include/swoole_async.h"
 #include "ext/swoole/include/swoole_client.h"
 #include "ext/swoole/include/swoole_api.h"
 
-#define PHP_SWOOLE_EXT_ASYNC_VERSION     "4.5.5"
-#define PHP_SWOOLE_EXT_ASYNC_VERSION_ID  40505
+#define PHP_SWOOLE_EXT_ASYNC_VERSION     "4.5.7"
+#define PHP_SWOOLE_EXT_ASYNC_VERSION_ID  40507
 
-#if SWOOLE_API_VERSION_ID < 0x202009a
+#if SWOOLE_API_VERSION_ID < 0x202011a
 #error "Ext version does not match the Swoole version"
 #endif
 
@@ -124,8 +124,8 @@ static sw_inline void* swoole_get_property(zval *zobject, int property_id)
     return swoole_get_property_by_handle(Z_OBJ_HANDLE_P(zobject), property_id);
 }
 
-swClient* php_swoole_async_client_new(zval *zobject, char *host, int host_len, int port);
-void php_swoole_async_client_free(zval *zobject, swClient *cli);
+swoole::network::Client* php_swoole_async_client_new(zval *zobject, char *host, int host_len, int port);
+void php_swoole_async_client_free(zval *zobject, swoole::network::Client *cli);
 
 BEGIN_EXTERN_C()
 

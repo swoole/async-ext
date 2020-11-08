@@ -25,6 +25,9 @@ static PHP_METHOD(swoole_msgqueue, setBlocking);
 static PHP_METHOD(swoole_msgqueue, stats);
 static PHP_METHOD(swoole_msgqueue, destroy);
 
+using swoole::MsgQueue;
+using swoole::QueueNode;
+
 zend_class_entry *swoole_msgqueue_ce;
 static zend_object_handlers swoole_msgqueue_handlers;
 
@@ -78,15 +81,11 @@ static PHP_METHOD(swoole_msgqueue, __construct)
         RETURN_FALSE;
     }
 
-    swMsgQueue *queue = (swMsgQueue *) emalloc(sizeof(swMsgQueue));
-    if (queue == NULL)
-    {
-        zend_throw_exception(swoole_exception_ce, "failed to create MsgQueue.", SW_ERROR_MALLOC_FAIL);
-        RETURN_FALSE;
-    }
-    if (swMsgQueue_create(queue, 1, key, perms))
+    MsgQueue *queue = new MsgQueue(key, true, perms);
+    if (!queue->ready())
     {
         zend_throw_exception(swoole_exception_ce, "failed to init MsgQueue.", SW_ERROR_MALLOC_FAIL);
+        delete queue;
         RETURN_FALSE;
     }
     swoole_set_object(ZEND_THIS, queue);
@@ -96,8 +95,8 @@ static PHP_METHOD(swoole_msgqueue, __destruct)
 {
     SW_PREVENT_USER_DESTRUCT();
 
-    swMsgQueue *queue = (swMsgQueue *) swoole_get_object(ZEND_THIS);
-    efree(queue);
+    MsgQueue *queue = (MsgQueue *) swoole_get_object(ZEND_THIS);
+    delete queue;
     swoole_set_object(ZEND_THIS, NULL);
 }
 
@@ -112,12 +111,12 @@ static PHP_METHOD(swoole_msgqueue, push)
         RETURN_FALSE;
     }
 
-    swQueue_data *in = (swQueue_data *) emalloc(length + sizeof(long) + 1);
+    QueueNode *in = (QueueNode *) emalloc(length + sizeof(long) + 1);
     in->mtype = type;
     memcpy(in->mdata, data, length + 1);
 
-    swMsgQueue *queue = (swMsgQueue *) swoole_get_object(ZEND_THIS);
-    int ret = swMsgQueue_push(queue, in, length);
+    MsgQueue *queue = (MsgQueue *) swoole_get_object(ZEND_THIS);
+    ssize_t ret = queue->push(in, length);
     efree(in);
     SW_CHECK_RETURN(ret);
 }
@@ -125,16 +124,16 @@ static PHP_METHOD(swoole_msgqueue, push)
 static PHP_METHOD(swoole_msgqueue, pop)
 {
     long type = 1;
-    swQueue_data out;
+    QueueNode out;
 
     if (zend_parse_parameters(ZEND_NUM_ARGS(), "|l", &type) == FAILURE)
     {
         RETURN_FALSE;
     }
 
-    swMsgQueue *queue = (swMsgQueue *) swoole_get_object(ZEND_THIS);
+    MsgQueue *queue = (MsgQueue *) swoole_get_object(ZEND_THIS);
     out.mtype = type;
-    int length = swMsgQueue_pop(queue, &out, sizeof(out.mdata));
+    ssize_t length = queue->pop(&out, sizeof(out.mdata));
     if (length < 0)
     {
         RETURN_FALSE;
@@ -144,22 +143,22 @@ static PHP_METHOD(swoole_msgqueue, pop)
 
 static PHP_METHOD(swoole_msgqueue, setBlocking)
 {
-    swMsgQueue *queue = (swMsgQueue *) swoole_get_object(ZEND_THIS);
+    MsgQueue *queue = (MsgQueue *) swoole_get_object(ZEND_THIS);
     zend_bool blocking;
 
     if (zend_parse_parameters(ZEND_NUM_ARGS(), "b", &blocking) == FAILURE)
     {
         RETURN_FALSE;
     }
-    swMsgQueue_set_blocking(queue, blocking);
+    queue->set_blocking(blocking);
 }
 
 static PHP_METHOD(swoole_msgqueue, stats)
 {
-    swMsgQueue *queue = (swMsgQueue *) swoole_get_object(ZEND_THIS);
+    MsgQueue *queue = (MsgQueue *) swoole_get_object(ZEND_THIS);
     size_t queue_num = -1;
     size_t queue_bytes = -1;
-    if (swMsgQueue_stat(queue, &queue_num, &queue_bytes) == 0)
+    if (queue->stat(&queue_num, &queue_bytes) == 0)
     {
         array_init(return_value);
         add_assoc_long_ex(return_value, ZEND_STRL("queue_num"), queue_num);
@@ -173,6 +172,6 @@ static PHP_METHOD(swoole_msgqueue, stats)
 
 static PHP_METHOD(swoole_msgqueue, destroy)
 {
-    swMsgQueue *queue = (swMsgQueue *) swoole_get_object(ZEND_THIS);
-    SW_CHECK_RETURN(swMsgQueue_free(queue));
+    MsgQueue *queue = (MsgQueue *) swoole_get_object(ZEND_THIS);
+    SW_CHECK_RETURN(queue->destroy());
 }

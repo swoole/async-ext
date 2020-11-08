@@ -71,7 +71,7 @@ typedef struct
     uint8_t type;
     zend_bool shared;
     zend_bool released;
-    swMemoryPool* pool;
+    swoole::MemoryPool* pool;
     sw_atomic_t slice_count;
 } MemoryPool;
 
@@ -131,7 +131,7 @@ static PHP_METHOD(swoole_memory_pool, __construct)
         Z_PARAM_BOOL(shared)
     ZEND_PARSE_PARAMETERS_END_EX(RETURN_FALSE);
 
-    swMemoryPool* pool = NULL;
+    swoole::MemoryPool* pool = NULL;
     if (type == memory_pool_type_fixed)
     {
         void *memory = (shared == 1) ? sw_shm_malloc(size) : sw_malloc(size);
@@ -140,15 +140,15 @@ static PHP_METHOD(swoole_memory_pool, __construct)
             zend_throw_exception(swoole_exception_ce, "malloc failed.", SW_ERROR_MALLOC_FAIL);
             RETURN_FALSE;
         }
-        pool = swFixedPool_new2(slice_size, memory, size);
+        pool = new swoole::FixedPool(slice_size, memory, size, shared);
     }
     else if (type == memory_pool_type_ring)
     {
-        pool = swRingBuffer_new(size, shared);
+        pool = new swoole::RingBuffer(size, shared);
     }
     else if (type == memory_pool_type_global)
     {
-        pool = swMemoryGlobal_new(slice_size, shared);
+        pool = new swoole::GlobalMemory(slice_size, shared);
     }
     else if (type == memory_pool_type_malloc || type == memory_pool_type_malloc)
     {
@@ -163,7 +163,7 @@ static PHP_METHOD(swoole_memory_pool, __construct)
     MemoryPool *mp;
     if (shared)
     {
-        mp = (MemoryPool *) SwooleG.memory_pool->alloc(SwooleG.memory_pool, sizeof(MemorySlice));
+        mp = (MemoryPool *) sw_mem_pool()->alloc(sizeof(MemorySlice));
     }
     else
     {
@@ -213,7 +213,7 @@ static PHP_METHOD(swoole_memory_pool, alloc)
     }
     else
     {
-        memory = mp->pool->alloc(mp->pool, size);
+        memory = mp->pool->alloc(size);
     }
 
     if (memory == NULL)
@@ -252,7 +252,7 @@ static PHP_METHOD(swoole_memory_pool, __destruct)
     mp->released = 1;
     if (mp->slice_count == 0)
     {
-        mp->pool->destroy(mp->pool);
+        delete mp->pool;
         if (mp->shared == 0)
         {
             efree(mp);
@@ -342,12 +342,12 @@ static PHP_METHOD(swoole_memory_pool_slice, __destruct)
     }
     else
     {
-        mp->pool->free(mp->pool, info->memory);
+        mp->pool->free(info->memory);
         sw_atomic_fetch_sub(&mp->slice_count, 1);
 
         if (mp->released && mp->slice_count == 0)
         {
-            mp->pool->destroy(mp->pool);
+            delete mp->pool;
             if (mp->shared == 0)
             {
                 efree(mp);

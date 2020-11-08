@@ -16,7 +16,7 @@
 */
 
 #include "php_swoole_async.h"
-#include "ext/swoole/php_swoole_client.h"
+#include "ext/swoole/ext-src/php_swoole_client.h"
 #include "swoole_http_client_async.h"
 #include "swoole_mime_type.h"
 
@@ -29,6 +29,9 @@
 #endif
 
 using swoole::TimerNode;
+using swClient = swoole::network::Client;
+using swoole::String;
+using swoole::File;
 
 typedef struct
 {
@@ -91,7 +94,7 @@ typedef struct
     /**
      * download page
      */
-    int file_fd;
+    File *file;
 
     swoole_http_parser parser;
 
@@ -349,16 +352,11 @@ static int http_client_execute(zval *zobject, char *uri, size_t uri_len, zval *c
 
     if (http->body == NULL)
     {
-        http->body = swString_new(SW_HTTP_RESPONSE_INIT_SIZE);
-        if (http->body == NULL)
-        {
-            php_swoole_fatal_error(E_ERROR, "[1] swString_new(%d) failed.", SW_HTTP_RESPONSE_INIT_SIZE);
-            return SW_ERR;
-        }
+        http->body = new String(SW_HTTP_RESPONSE_INIT_SIZE);
     }
     else
     {
-        swString_clear(http->body);
+        http->body->clear();
     }
 
     if (http->uri)
@@ -382,32 +380,30 @@ static int http_client_execute(zval *zobject, char *uri, size_t uri_len, zval *c
      */
     if (hcc->download_file)
     {
-        int fd = open(Z_STRVAL_P(hcc->download_file), O_CREAT | O_WRONLY, 0664);
-        if (fd < 0)
+        std::unique_ptr<File> _fp(new File(Z_STRVAL_P(hcc->download_file), O_CREAT | O_WRONLY, 0664));
+        if (!_fp->ready())
         {
             swSysError("open(%s, O_CREAT | O_WRONLY) failed.", Z_STRVAL_P(hcc->download_file));
             return SW_ERR;
         }
         if (hcc->download_offset == 0)
         {
-            if (ftruncate(fd, 0) < 0)
+            if (!_fp->truncate(0))
             {
                 swSysError("ftruncate(%s) failed.", Z_STRVAL_P(hcc->download_file));
-                close(fd);
                 return SW_ERR;
             }
         }
         else
         {
-            if (lseek(fd, hcc->download_offset, SEEK_SET) < 0)
+            if (_fp->set_offest(hcc->download_offset) < 0)
             {
                 swSysError("fseek(%s, %jd) failed.", Z_STRVAL_P(hcc->download_file), (intmax_t) hcc->download_offset);
-                close(fd);
                 return SW_ERR;
             }
         }
         http->download = 1;
-        http->file_fd = fd;
+        http->file = _fp.release();
         hcc->download_file = NULL;
     }
 
@@ -473,9 +469,9 @@ static int http_client_execute(zval *zobject, char *uri, size_t uri_len, zval *c
             {
                 char _buf1[128];
                 char _buf2[256];
-                int _n1 = sw_snprintf(_buf1, sizeof(_buf1), "%*s:%*s", http->cli->http_proxy->username.length(),
-                        http->cli->http_proxy->username.c_str(), http->cli->http_proxy->password.length(),
-                        http->cli->http_proxy->password);
+                int _n1 = sw_snprintf(_buf1, sizeof(_buf1), "%*s:%*s", (int) http->cli->http_proxy->username.length(),
+                        http->cli->http_proxy->username.c_str(), (int) http->cli->http_proxy->password.length(),
+                        http->cli->http_proxy->password.c_str());
                 zend_string *str = php_base64_encode((const unsigned char *) _buf1, _n1);
                 int _n2 = sw_snprintf(_buf2, sizeof(_buf2), "Basic %*s", (int)ZSTR_LEN(str), ZSTR_VAL(str));
                 zend_string_free(str);
@@ -535,11 +531,7 @@ void swoole_http_client_init(int module_number)
     zend_declare_property_null(swoole_http_client_ce, ZEND_STRL("onMessage"), ZEND_ACC_PUBLIC);
     zend_declare_property_null(swoole_http_client_ce, ZEND_STRL("onClose"), ZEND_ACC_PUBLIC);
 
-    http_client_buffer = swString_new(SW_HTTP_RESPONSE_INIT_SIZE);
-    if (!http_client_buffer)
-    {
-        php_swoole_fatal_error(E_ERROR, "[1] swString_new(%d) failed", SW_HTTP_RESPONSE_INIT_SIZE);
-    }
+    http_client_buffer = new String(SW_HTTP_RESPONSE_INIT_SIZE);
 }
 
 static void http_client_execute_callback(zval *zobject, enum php_swoole_client_callback_type type)
@@ -778,7 +770,7 @@ static void http_client_onReceive(swClient *cli, const char *data, uint32_t leng
             http->header_completed = 1;
             data = buffer->str;
             length = buffer->length;
-            swString_clear(buffer);
+            buffer->clear();
         }
     }
 
@@ -824,7 +816,7 @@ static void http_client_onReceive(swClient *cli, const char *data, uint32_t leng
         }
         else
         {
-            swString_clear(cli->buffer);
+            cli->buffer->clear();
         }
     }
 
@@ -934,7 +926,7 @@ static int http_client_send_http_request(zval *zobject)
     int keytype;
     zval *value = NULL;
 
-    swString_clear(http_client_buffer);
+    http_client_buffer->clear();
     http_client_buffer->append(hcc->request_method, strlen(hcc->request_method));
     hcc->request_method = NULL;
     http_client_buffer->append(ZEND_STRL(" "));
@@ -1308,13 +1300,13 @@ static void http_client_clear(http_client *http)
     // Tie up the loose ends
     if (http->download)
     {
-        close(http->file_fd);
+        delete http->file;
         http->download = 0;
-        http->file_fd = 0;
+        http->file = nullptr;
 #ifdef SW_HAVE_ZLIB
         if (http->gzip_buffer)
         {
-            swString_free(http->gzip_buffer);
+            delete http->gzip_buffer;
             http->gzip_buffer = NULL;
         }
 #endif
@@ -1368,7 +1360,7 @@ static uint8_t http_client_free(zval *zobject)
     }
     if (http->body)
     {
-        swString_free(http->body);
+        delete http->body;
     }
 
     http_client_clear(http);
@@ -1876,7 +1868,7 @@ static void http_init_gzip_stream(http_client *http)
     memset(&http->gzip_stream, 0, sizeof(http->gzip_stream));
     if (http->download)
     {
-        http->gzip_buffer = swString_new(8192);
+        http->gzip_buffer = new String(8192);
     }
     else
     {
@@ -1900,7 +1892,7 @@ static int php_swoole_zlib_uncompress(z_stream *stream, swString *buffer, char *
             stream->avail_in, stream->avail_out, stream->total_in, stream->total_out);
 #endif
 
-    swString_clear(buffer);
+    buffer->clear();
 
     while (1)
     {
@@ -1960,7 +1952,7 @@ static int http_client_parser_on_body(swoole_http_parser *parser, const char *at
             {
                 return -1;
             }
-            if (swoole_sync_writefile(http->file_fd, http->gzip_buffer->str, http->gzip_buffer->length) < 0)
+            if (http->file->write_all(http->gzip_buffer->str, http->gzip_buffer->length) < 0)
             {
                 return -1;
             }
@@ -1968,12 +1960,12 @@ static int http_client_parser_on_body(swoole_http_parser *parser, const char *at
         else
 #endif
         {
-            if (swoole_sync_writefile(http->file_fd, (void*) http->body->str, http->body->length) < 0)
+            if (http->file->write_all(http->body->str, http->body->length) < 0)
             {
                 return -1;
             }
         }
-        swString_clear(http->body);
+        http->body->clear();
     }
     return 0;
 }
@@ -2236,7 +2228,7 @@ static PHP_METHOD(swoole_http_client, push)
         }
     }
 
-    swString_clear(http_client_buffer);
+    http_client_buffer->clear();
     if (php_swoole_websocket_frame_pack(http_client_buffer, zdata, opcode, flags & SW_WEBSOCKET_FLAGS_ALL, http->websocket_mask, 0) < 0)
     {
         RETURN_FALSE;

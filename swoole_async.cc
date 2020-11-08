@@ -15,7 +15,7 @@
 */
 
 #include "php_swoole_async.h"
-#include "ext/swoole/php_swoole_cxx.h"
+#include "ext/swoole/ext-src/php_swoole_cxx.h"
 #include "ext/swoole/include/swoole_process_pool.h"
 #include "php_streams.h"
 #include "php_network.h"
@@ -138,7 +138,7 @@ typedef struct rr_flags
 } RR_FLAGS;
 
 static uint16_t swoole_dns_request_id = 1;
-static swClient *resolver_socket = NULL;
+static swoole::network::Client *resolver_socket = NULL;
 static std::unordered_map<std::string, swDNS_lookup_request *> *request_map;
 
 namespace swoole { namespace async {
@@ -240,20 +240,18 @@ void handler_fgets(AsyncEvent *event) {
 }
 
 void handler_read_file(AsyncEvent *event) {
-    swString *data;
     int ret = -1;
-    int fd = open((char *) event->req, O_RDONLY);
-    if (fd < 0) {
+    swoole::File fp((char *) event->req, O_RDONLY);
+    if (!fp.ready()) {
         swSysWarn("open(%s, O_RDONLY) failed", (char *) event->req);
         event->ret = ret;
         event->error = errno;
         return;
     }
     struct stat file_stat;
-    if (fstat(fd, &file_stat) < 0) {
+    if (!fp.stat(&file_stat)) {
         swSysWarn("fstat(%s) failed", (char *) event->req);
     _error:
-        close(fd);
         event->ret = ret;
         event->error = errno;
         return;
@@ -262,67 +260,44 @@ void handler_read_file(AsyncEvent *event) {
         errno = EISDIR;
         goto _error;
     }
-
-    /**
-     * lock
-     */
-    if (event->lock && flock(fd, LOCK_SH) < 0) {
+    if (event->lock && !fp.lock(LOCK_SH)) {
         swSysWarn("flock(%d, LOCK_SH) failed", event->fd);
         goto _error;
     }
-    /**
-     * regular file
-     */
-    if (file_stat.st_size == 0) {
-        data = swoole_sync_readfile_eof(fd);
-        if (data == nullptr) {
-            goto _error;
-        }
-    } else {
-        data = swoole::make_string(file_stat.st_size);
-        if (data == nullptr) {
-            goto _error;
-        }
-        data->length = swoole_sync_readfile(fd, data->str, file_stat.st_size);
-    }
+    auto data = fp.read_content();
     event->ret = data->length;
-    event->buf = data;
-    /**
-     * unlock
-     */
-    if (event->lock && flock(fd, LOCK_UN) < 0) {
+    event->buf = data.get();
+    data.reset();
+    if (event->lock && !fp.unlock()) {
         swSysWarn("flock(%d, LOCK_UN) failed", event->fd);
     }
-    close(fd);
     event->error = 0;
 }
 
 void handler_write_file(AsyncEvent *event) {
     int ret = -1;
-    int fd = open((char *) event->req, event->flags, 0644);
-    if (fd < 0) {
+    swoole::File fp((char *) event->req, event->flags, 0644);
+    if (!fp.ready()) {
         swSysWarn("open(%s, %d) failed", (char *) event->req, event->flags);
         event->ret = ret;
         event->error = errno;
         return;
     }
-    if (event->lock && flock(fd, LOCK_EX) < 0) {
+    if (event->lock && !fp.lock(LOCK_EX)) {
         swSysWarn("flock(%d, LOCK_EX) failed", event->fd);
         event->ret = ret;
         event->error = errno;
-        close(fd);
         return;
     }
-    size_t written = swoole_sync_writefile(fd, event->buf, event->nbytes);
+    size_t written = fp.write_all(event->buf, event->nbytes);
     if (event->flags & SW_AIO_WRITE_FSYNC) {
-        if (fsync(fd) < 0) {
+        if (!fp.sync()) {
             swSysWarn("fsync(%d) failed", event->fd);
         }
     }
-    if (event->lock && flock(fd, LOCK_UN) < 0) {
+    if (event->lock && !fp.unlock()) {
         swSysWarn("flock(%d, LOCK_UN) failed", event->fd);
     }
-    close(fd);
     event->ret = written;
     event->error = 0;
 }
@@ -1633,7 +1608,7 @@ static int swDNSResolver_request(const char *domain, void (*callback)(const char
 
     if (resolver_socket == NULL)
     {
-        resolver_socket = new swClient(SW_SOCK_UDP, false);
+        resolver_socket = new swoole::network::Client(SW_SOCK_UDP, false);
         if (!resolver_socket->socket)
         {
             delete resolver_socket;
@@ -1664,7 +1639,7 @@ static int swDNSResolver_request(const char *domain, void (*callback)(const char
 
     if (!sw_reactor()->exists(resolver_socket->socket))
     {
-        if (sw_reactor()->add(sw_reactor(), resolver_socket->socket, SW_FD_DNS_RESOLVER) < 0)
+        if (sw_reactor()->add(resolver_socket->socket, SW_FD_DNS_RESOLVER) < 0)
         {
             goto _do_close;
         }
@@ -1787,7 +1762,7 @@ static int process_stream_onRead(swReactor *reactor, swEvent *event)
     zval *retval = NULL;
     zval args[2];
 
-    sw_reactor()->del(sw_reactor(), event->socket);
+    sw_reactor()->del(event->socket);
 
     if (ps->buffer->length == 0)
     {
@@ -1797,7 +1772,7 @@ static int process_stream_onRead(swReactor *reactor, swEvent *event)
     {
         ZVAL_STRINGL(&args[0], ps->buffer->str, ps->buffer->length);
     }
-    swString_free(ps->buffer);
+    delete ps->buffer;
 
     int status;
     pid_t pid = swoole_waitpid(ps->pid, &status, WNOHANG);
@@ -1861,12 +1836,7 @@ PHP_METHOD(swoole_async, exec)
         RETURN_FALSE;
     }
 
-    swString *buffer = swString_new(1024);
-    if (buffer == NULL)
-    {
-        RETURN_FALSE;
-    }
-
+    auto *buffer = new swoole::String(1024);
     process_stream *ps = (process_stream *) emalloc(sizeof(process_stream));
     ps->callback = sw_zval_dup(callback);
     Z_TRY_ADDREF_P(ps->callback);
@@ -1876,7 +1846,7 @@ PHP_METHOD(swoole_async, exec)
     ps->socket = swoole::make_socket(fd, (enum swFd_type) PHP_SWOOLE_FD_PROCESS_STREAM);
     ps->socket->object = ps;
 
-    if (sw_reactor()->add(sw_reactor(), ps->socket, SW_EVENT_READ) < 0)
+    if (sw_reactor()->add(ps->socket, SW_EVENT_READ) < 0)
     {
         sw_zval_free(ps->callback);
         efree(ps);

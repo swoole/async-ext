@@ -371,7 +371,7 @@ typedef struct _mysql_client
     uint32_t switch_check :1; /* check if server request auth switch */
     uint8_t handshake;
     uint8_t cmd; /* help with judging to do what in callback */
-    swClient *cli;
+    swoole::network::Client *cli;
     zval *object;
     zval *callback;
     uint32_t transaction :1;

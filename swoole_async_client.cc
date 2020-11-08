@@ -15,14 +15,15 @@
 */
 
 #include "php_swoole_async.h"
-#include "ext/swoole/php_swoole_cxx.h"
-#include "ext/swoole/php_swoole_client.h"
+#include "ext/swoole/ext-src/php_swoole_cxx.h"
+#include "ext/swoole/ext-src/php_swoole_client.h"
 #include "ext/swoole/include/swoole_proxy.h"
 #include "ext/swoole/include/swoole_mqtt.h"
 
 #include <string>
 
 using namespace std;
+using swClient = swoole::network::Client;
 
 #include "ext/standard/basic_functions.h"
 
@@ -1044,7 +1045,7 @@ static PHP_METHOD(swoole_async_client, getPeerCert)
         RETURN_FALSE;
     }
     char buf[8192];
-    int n = swSSL_get_peer_cert(cli->socket->ssl, buf, sizeof(buf));
+    int n = cli->socket->ssl_get_peer_certificate(buf, sizeof(buf));
     if (n < 0)
     {
         RETURN_FALSE;

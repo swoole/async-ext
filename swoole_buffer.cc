@@ -56,7 +56,7 @@ static void php_swoole_buffer_free_object(zend_object *object)
     buffer_t *buffer = php_swoole_buffer_fetch_object(object);
     if (buffer->ptr)
     {
-        swString_free(buffer->ptr);
+        delete buffer->ptr;
     }
     zend_object_std_dtor(object);
 }
@@ -179,12 +179,7 @@ static PHP_METHOD(swoole_buffer, __construct)
         RETURN_FALSE;
     }
 
-    buffer = swString_new(size);
-    if (buffer == NULL)
-    {
-        zend_throw_exception_ex(swoole_exception_ce, errno, "malloc(" ZEND_LONG_FMT ") failed", size);
-        RETURN_FALSE;
-    }
+    buffer = new swoole::String(size);
 
     php_swoole_buffer_set_ptr(ZEND_THIS, buffer);
     zend_update_property_long(swoole_buffer_ce, ZEND_THIS, ZEND_STRL("capacity"), size);
