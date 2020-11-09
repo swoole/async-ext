@@ -116,62 +116,51 @@ static PHP_METHOD(swoole_msgqueue, push)
     memcpy(in->mdata, data, length + 1);
 
     MsgQueue *queue = (MsgQueue *) swoole_get_object(ZEND_THIS);
-    ssize_t ret = queue->push(in, length);
+    RETVAL_BOOL(queue->push(in, length));
     efree(in);
-    SW_CHECK_RETURN(ret);
 }
 
-static PHP_METHOD(swoole_msgqueue, pop)
-{
+static PHP_METHOD(swoole_msgqueue, pop) {
     long type = 1;
     QueueNode out;
 
-    if (zend_parse_parameters(ZEND_NUM_ARGS(), "|l", &type) == FAILURE)
-    {
+    if (zend_parse_parameters(ZEND_NUM_ARGS(), "|l", &type) == FAILURE) {
         RETURN_FALSE;
     }
 
-    MsgQueue *queue = (MsgQueue *) swoole_get_object(ZEND_THIS);
+    MsgQueue *queue = (MsgQueue*) swoole_get_object(ZEND_THIS);
     out.mtype = type;
     ssize_t length = queue->pop(&out, sizeof(out.mdata));
-    if (length < 0)
-    {
+    if (length < 0) {
         RETURN_FALSE;
     }
     RETURN_STRINGL(out.mdata, length);
 }
 
-static PHP_METHOD(swoole_msgqueue, setBlocking)
-{
-    MsgQueue *queue = (MsgQueue *) swoole_get_object(ZEND_THIS);
+static PHP_METHOD(swoole_msgqueue, setBlocking) {
+    MsgQueue *queue = (MsgQueue*) swoole_get_object(ZEND_THIS);
     zend_bool blocking;
 
-    if (zend_parse_parameters(ZEND_NUM_ARGS(), "b", &blocking) == FAILURE)
-    {
+    if (zend_parse_parameters(ZEND_NUM_ARGS(), "b", &blocking) == FAILURE) {
         RETURN_FALSE;
     }
     queue->set_blocking(blocking);
 }
 
-static PHP_METHOD(swoole_msgqueue, stats)
-{
-    MsgQueue *queue = (MsgQueue *) swoole_get_object(ZEND_THIS);
+static PHP_METHOD(swoole_msgqueue, stats) {
+    MsgQueue *queue = (MsgQueue*) swoole_get_object(ZEND_THIS);
     size_t queue_num = -1;
     size_t queue_bytes = -1;
-    if (queue->stat(&queue_num, &queue_bytes) == 0)
-    {
+    if (queue->stat(&queue_num, &queue_bytes)) {
         array_init(return_value);
         add_assoc_long_ex(return_value, ZEND_STRL("queue_num"), queue_num);
         add_assoc_long_ex(return_value, ZEND_STRL("queue_bytes"), queue_bytes);
-    }
-    else
-    {
+    } else {
         RETURN_FALSE;
     }
 }
 
-static PHP_METHOD(swoole_msgqueue, destroy)
-{
-    MsgQueue *queue = (MsgQueue *) swoole_get_object(ZEND_THIS);
-    SW_CHECK_RETURN(queue->destroy());
+static PHP_METHOD(swoole_msgqueue, destroy) {
+    MsgQueue *queue = (MsgQueue*) swoole_get_object(ZEND_THIS);
+    RETURN_BOOL(queue->destroy());
 }
