@@ -807,8 +807,7 @@ static void aio_onFileCompleted(AsyncEvent *event)
             ev.handler = swoole::async::handler_read;
             ev.callback = aio_onFileCompleted;
 
-            ssize_t ret = swoole::async::dispatch(&ev);
-            if (ret < 0)
+            if (swoole::async::dispatch(&ev) == nullptr)
             {
                 php_swoole_fatal_error(E_WARNING, "swoole_async: continue to read failed. Error: %s[%d]", strerror(event->error), event->error);
                 goto close_file;
@@ -920,15 +919,7 @@ PHP_FUNCTION(swoole_async_read)
     ev.callback = aio_onFileCompleted;
 
     php_swoole_check_reactor();
-    ssize_t ret = swoole::async::dispatch(&ev);
-    if (ret == SW_ERR)
-    {
-        RETURN_FALSE;
-    }
-    else
-    {
-        RETURN_TRUE;
-    }
+    RETURN_BOOL(swoole::async::dispatch(&ev) != nullptr);
 }
 
 PHP_FUNCTION(swoole_async_write)
@@ -1027,8 +1018,7 @@ PHP_FUNCTION(swoole_async_write)
     ev.callback = aio_onFileCompleted;
 
     php_swoole_check_reactor();
-    ssize_t ret = swoole::async::dispatch(&ev);
-    if (ret == SW_ERR)
+    if (swoole::async::dispatch(&ev) == nullptr)
     {
         RETURN_FALSE;
     }
@@ -1112,8 +1102,7 @@ PHP_FUNCTION(swoole_async_readfile)
     ev.callback = aio_onFileCompleted;
 
     php_swoole_check_reactor();
-    ssize_t ret = swoole::async::dispatch(&ev);
-    if (ret == SW_ERR)
+    if (swoole::async::dispatch(&ev) == nullptr)
     {
         RETURN_FALSE;
     }
@@ -1211,8 +1200,7 @@ PHP_FUNCTION(swoole_async_writefile)
     ev.callback = aio_onFileCompleted;
 
     php_swoole_check_reactor();
-    ssize_t ret = swoole::async::dispatch(&ev);
-    if (ret == SW_ERR)
+    if (swoole::async::dispatch(&ev) == nullptr)
     {
         RETURN_FALSE;
     }
@@ -1290,7 +1278,7 @@ PHP_FUNCTION(swoole_async_set)
     }
     if (php_swoole_array_get_value(vht, "enable_coroutine", v))
     {
-        SwooleG.enable_coroutine = zval_is_true(v);
+        SWOOLE_G(enable_coroutine) = zval_is_true(v);
     }
 }
 
@@ -1735,7 +1723,7 @@ PHP_FUNCTION(swoole_async_dns_lookup)
     ev.callback = aio_onDNSCompleted;
 
     php_swoole_check_reactor();
-    SW_CHECK_RETURN(swoole::async::dispatch(&ev));
+    RETURN_BOOL(swoole::async::dispatch(&ev) != nullptr);
 }
 
 static int process_stream_onRead(swReactor *reactor, swEvent *event)
@@ -1865,7 +1853,7 @@ PHP_MINIT_FUNCTION(swoole_async)
 //    ZEND_INIT_MODULE_GLOBALS(swoole, php_swoole_async_init_globals, NULL);
 //    REGISTER_INI_ENTRIES();
 
-    if (PHP_SWOOLE_EXT_ASYNC_VERSION_ID != swoole_version_id())
+    if (PHP_SWOOLE_EXT_ASYNC_API_REQUIREMENT > swoole_api_version_id())
     {
         php_swoole_fatal_error(
             E_CORE_ERROR,

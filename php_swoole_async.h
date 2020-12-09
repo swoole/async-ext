@@ -30,10 +30,11 @@
 #include "ext/swoole/include/swoole_client.h"
 #include "ext/swoole/include/swoole_api.h"
 
-#define PHP_SWOOLE_EXT_ASYNC_VERSION     "4.5.7"
-#define PHP_SWOOLE_EXT_ASYNC_VERSION_ID  40507
+#define PHP_SWOOLE_EXT_ASYNC_VERSION     "4.6.0"
+#define PHP_SWOOLE_EXT_ASYNC_VERSION_ID  40600
+#define PHP_SWOOLE_EXT_ASYNC_API_REQUIREMENT  0x202012a
 
-#if SWOOLE_API_VERSION_ID < 0x202011a
+#if SWOOLE_API_VERSION_ID < PHP_SWOOLE_EXT_ASYNC_API_REQUIREMENT
 #error "Ext version does not match the Swoole version"
 #endif
 
