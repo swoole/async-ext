@@ -23,7 +23,7 @@
 #include "config.h"
 #endif
 
-#include "ext/swoole/ext-src/php_swoole.h"
+#include "ext/swoole/ext-src/php_swoole_private.h"
 #include "ext/swoole/ext-src/php_swoole_cxx.h"
 #include "ext/swoole/include/swoole_config.h"
 #include "ext/swoole/include/swoole_async.h"
@@ -32,7 +32,7 @@
 
 #define PHP_SWOOLE_EXT_ASYNC_VERSION     "4.6.0"
 #define PHP_SWOOLE_EXT_ASYNC_VERSION_ID  40600
-#define PHP_SWOOLE_EXT_ASYNC_API_REQUIREMENT  0x202012a
+#define PHP_SWOOLE_EXT_ASYNC_API_REQUIREMENT  0x202107a
 
 #if SWOOLE_API_VERSION_ID < PHP_SWOOLE_EXT_ASYNC_API_REQUIREMENT
 #error "Ext version does not match the Swoole version"

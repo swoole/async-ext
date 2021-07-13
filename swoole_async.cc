@@ -147,7 +147,7 @@ void handler_read(AsyncEvent *event) {
     int ret = -1;
     if (event->lock && flock(event->fd, LOCK_SH) < 0) {
         swSysWarn("flock(%d, LOCK_SH) failed", event->fd);
-        event->ret = -1;
+        event->retval = -1;
         event->error = errno;
         return;
     }
@@ -164,14 +164,14 @@ void handler_read(AsyncEvent *event) {
     if (ret < 0) {
         event->error = errno;
     }
-    event->ret = ret;
+    event->retval = ret;
 }
 
 void handler_fread(AsyncEvent *event) {
     int ret = -1;
     if (event->lock && flock(event->fd, LOCK_SH) < 0) {
         swSysWarn("flock(%d, LOCK_SH) failed", event->fd);
-        event->ret = -1;
+        event->retval = -1;
         event->error = errno;
         return;
     }
@@ -188,7 +188,7 @@ void handler_fread(AsyncEvent *event) {
     if (ret < 0) {
         event->error = errno;
     }
-    event->ret = ret;
+    event->retval = ret;
 }
 
 void handler_fwrite(AsyncEvent *event) {
@@ -215,13 +215,13 @@ void handler_fwrite(AsyncEvent *event) {
     if (ret < 0) {
         event->error = errno;
     }
-    event->ret = ret;
+    event->retval = ret;
 }
 
 void handler_fgets(AsyncEvent *event) {
     if (event->lock && flock(event->fd, LOCK_SH) < 0) {
         swSysWarn("flock(%d, LOCK_SH) failed", event->fd);
-        event->ret = -1;
+        event->retval = -1;
         event->error = errno;
         return;
     }
@@ -229,7 +229,7 @@ void handler_fgets(AsyncEvent *event) {
     FILE *file = (FILE *) event->req;
     char *data = fgets((char *) event->buf, event->nbytes, file);
     if (data == nullptr) {
-        event->ret = -1;
+        event->retval = -1;
         event->error = errno;
         event->flags = SW_AIO_EOF;
     }
@@ -244,7 +244,7 @@ void handler_read_file(AsyncEvent *event) {
     swoole::File fp((char *) event->req, O_RDONLY);
     if (!fp.ready()) {
         swSysWarn("open(%s, O_RDONLY) failed", (char *) event->req);
-        event->ret = ret;
+        event->retval = ret;
         event->error = errno;
         return;
     }
@@ -252,7 +252,7 @@ void handler_read_file(AsyncEvent *event) {
     if (!fp.stat(&file_stat)) {
         swSysWarn("fstat(%s) failed", (char *) event->req);
     _error:
-        event->ret = ret;
+        event->retval = ret;
         event->error = errno;
         return;
     }
@@ -265,7 +265,7 @@ void handler_read_file(AsyncEvent *event) {
         goto _error;
     }
     auto data = fp.read_content();
-    event->ret = data->length;
+    event->retval = data->length;
     event->buf = data.get();
     data.reset();
     if (event->lock && !fp.unlock()) {
@@ -279,13 +279,13 @@ void handler_write_file(AsyncEvent *event) {
     swoole::File fp((char *) event->req, event->flags, 0644);
     if (!fp.ready()) {
         swSysWarn("open(%s, %d) failed", (char *) event->req, event->flags);
-        event->ret = ret;
+        event->retval = ret;
         event->error = errno;
         return;
     }
     if (event->lock && !fp.lock(LOCK_EX)) {
         swSysWarn("flock(%d, LOCK_EX) failed", event->fd);
-        event->ret = ret;
+        event->retval = ret;
         event->error = errno;
         return;
     }
@@ -298,7 +298,7 @@ void handler_write_file(AsyncEvent *event) {
     if (event->lock && !fp.unlock()) {
         swSysWarn("flock(%d, LOCK_UN) failed", event->fd);
     }
-    event->ret = written;
+    event->retval = written;
     event->error = 0;
 }
 
@@ -326,7 +326,7 @@ void handler_write(AsyncEvent *event) {
     if (ret < 0) {
         event->error = errno;
     }
-    event->ret = ret;
+    event->retval = ret;
 }
 
 }}
@@ -633,7 +633,7 @@ static void aio_onDNSCompleted(AsyncEvent *event)
     zcallback = dns_req->callback;
     ZVAL_NULL(zcontent);
 
-    ret = event->ret;
+    ret = event->retval;
     if (ret < 0)
     {
         swoole_set_last_error(event->error);
@@ -679,7 +679,7 @@ static void aio_onDNSCompleted(AsyncEvent *event)
 static void aio_onFileCompleted(AsyncEvent *event)
 {
     int isEOF = false;
-    int64_t ret = event->ret;
+    int64_t ret = event->retval;
     file_request *file_req = (file_request *) event->object;
 
     zval *retval = NULL, *zcallback = NULL;
@@ -709,7 +709,7 @@ static void aio_onFileCompleted(AsyncEvent *event)
         }
         else if (file_req->read_op)
         {
-            file_req->offset += event->ret;
+            file_req->offset += event->retval;
         }
     }
 
@@ -788,9 +788,9 @@ static void aio_onFileCompleted(AsyncEvent *event)
             goto close_file;
         }
         //Less than expected, at the end of the file
-        else if (event->ret < (int) event->nbytes)
+        else if (event->retval < (int) event->nbytes)
         {
-            event->ret = 0;
+            event->retval = 0;
             aio_onFileCompleted(event);
         }
         //continue to read
@@ -1227,6 +1227,9 @@ PHP_FUNCTION(swoole_async_set)
     ZEND_PARSE_PARAMETERS_END_EX(RETURN_FALSE);
 
     vht = Z_ARRVAL_P(zset);
+
+    php_swoole_set_global_option(vht);
+
     if (php_swoole_array_get_value(vht, "enable_signalfd", v))
     {
         SwooleG.enable_signalfd = zval_is_true(v);
@@ -1234,18 +1237,6 @@ PHP_FUNCTION(swoole_async_set)
     if (php_swoole_array_get_value(vht, "dns_cache_refresh_time", v))
     {
           SwooleG.dns_cache_refresh_time = zval_get_double(v);
-    }
-    if (php_swoole_array_get_value(vht, "socket_buffer_size", v))
-    {
-        swoole::network::Socket::default_buffer_size = zval_get_long(v);
-        if (swoole::network::Socket::default_buffer_size <= 0 || swoole::network::Socket::default_buffer_size > INT_MAX)
-        {
-            swoole::network::Socket::default_buffer_size = INT_MAX;
-        }
-    }
-    if (php_swoole_array_get_value(vht, "log_level", v))
-    {
-        sw_logger()->set_level(zval_get_long(v));
     }
     if (php_swoole_array_get_value(vht, "thread_num", v) || php_swoole_array_get_value(vht, "min_thread_num", v))
     {
@@ -1255,10 +1246,6 @@ PHP_FUNCTION(swoole_async_set)
     {
         SwooleG.aio_worker_num = zval_get_long(v);
     }
-    if (php_swoole_array_get_value(vht, "display_errors", v))
-    {
-        SWOOLE_G(display_errors) = zval_is_true(v);
-    }
     if (php_swoole_array_get_value(vht, "socket_dontwait", v))
     {
         SwooleG.socket_dontwait = zval_is_true(v);
@@ -1266,11 +1253,6 @@ PHP_FUNCTION(swoole_async_set)
     if (php_swoole_array_get_value(vht, "dns_lookup_random", v))
     {
         SwooleG.dns_lookup_random = zval_is_true(v);
-    }
-    if (php_swoole_array_get_value(vht, "dns_server", v))
-    {
-        zend::String str_v(v);
-        SwooleG.dns_server_v4 = sw_strndup(str_v.val(), str_v.len());
     }
     if (php_swoole_array_get_value(vht, "use_async_resolver", v))
     {
@@ -1333,41 +1315,6 @@ static void domain_decode(char *str)
         str[i] = '.';
     }
     str[i - 1] = '\0';
-}
-
-static int swDNSResolver_get_server()
-{
-    FILE *fp;
-    char line[100];
-    char buf[16] = {0};
-
-    if ((fp = fopen(SW_DNS_SERVER_CONF, "rt")) == NULL)
-    {
-        swSysWarn("fopen(" SW_DNS_SERVER_CONF ") failed");
-        return SW_ERR;
-    }
-
-    while (fgets(line, 100, fp))
-    {
-        if (strncmp(line, "nameserver", 10) == 0)
-        {
-            strcpy(buf, strtok(line, " "));
-            strcpy(buf, strtok(NULL, "\n"));
-            break;
-        }
-    }
-    fclose(fp);
-
-    if (strlen(buf) == 0)
-    {
-        SwooleG.dns_server_v4 = sw_strdup(SW_DNS_DEFAULT_SERVER);
-    }
-    else
-    {
-        SwooleG.dns_server_v4 = sw_strdup(buf);
-    }
-
-    return SW_OK;
 }
 
 static int swDNSResolver_onReceive(swReactor *reactor, swEvent *event)
@@ -1527,12 +1474,9 @@ static int swDNSResolver_request(const char *domain, void (*callback)(const char
     swDNSResolver_header *header = NULL;
     int steps = 0;
 
-    if (SwooleG.dns_server_v4 == NULL)
-    {
-        if (swDNSResolver_get_server() < 0)
-        {
-            return SW_ERR;
-        }
+    auto dns_server = swoole_get_dns_server();
+    if (dns_server.first.empty() && !swoole_load_resolv_conf()) {
+        return SW_ERR;
     }
 
     header = (swDNSResolver_header *) packet;
@@ -1594,27 +1538,14 @@ static int swDNSResolver_request(const char *domain, void (*callback)(const char
     qflags->qclass = htons(0x0001);
     steps += sizeof(Q_FLAGS);
 
-    if (resolver_socket == NULL)
-    {
+    if (resolver_socket == NULL) {
         resolver_socket = new swoole::network::Client(SW_SOCK_UDP, false);
-        if (!resolver_socket->socket)
-        {
+        if (!resolver_socket->socket) {
             delete resolver_socket;
             return SW_ERR;
         }
-        do
-        {
-            char *_port = NULL;
-            int dns_server_port = SW_DNS_SERVER_PORT;
-            char dns_server_host[32];
-            strcpy(dns_server_host, SwooleG.dns_server_v4);
-            if ((_port = strchr(SwooleG.dns_server_v4, ':')))
-            {
-                dns_server_port = atoi(_port + 1);
-                dns_server_host[_port - SwooleG.dns_server_v4] = '\0';
-            }
-            if (resolver_socket->connect(resolver_socket, dns_server_host, dns_server_port, 1, 0) < 0)
-            {
+        do {
+            if (resolver_socket->connect(resolver_socket, dns_server.first.c_str(), dns_server.second, 1, 0) < 0) {
                 goto _do_close;
             }
         } while (0);

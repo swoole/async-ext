@@ -33,6 +33,8 @@ using swClient = swoole::network::Client;
 using swoole::String;
 using swoole::File;
 
+namespace WebSocket = swoole::websocket;
+
 typedef struct
 {
     zval *onConnect;
@@ -803,7 +805,7 @@ static void http_client_onReceive(swClient *cli, const char *data, uint32_t leng
     if (http->upgrade)
     {
         cli->open_length_check = 1;
-        cli->protocol.get_package_length = swWebSocket_get_package_length;
+        cli->protocol.get_package_length = WebSocket::get_package_length;
         cli->protocol.onPackage = http_client_onMessage;
         cli->protocol.package_length_size = SW_WEBSOCKET_HEADER_LEN + SW_WEBSOCKET_MASK_LEN + sizeof(uint64_t);
         http->state = HTTP_CLIENT_STATE_UPGRADE;
@@ -2187,9 +2189,9 @@ static PHP_METHOD(swoole_http_client, upgrade)
 static PHP_METHOD(swoole_http_client, push)
 {
     zval *zdata;
-    zend_long opcode = WEBSOCKET_OPCODE_TEXT;
+    zend_long opcode = WebSocket::OPCODE_TEXT;
     zval *zflags = NULL;
-    zend_long flags = SW_WEBSOCKET_FLAG_FIN;
+    zend_long flags = WebSocket::FLAG_FIN;
 
     ZEND_PARSE_PARAMETERS_START(1, 3)
         Z_PARAM_ZVAL(zdata)
@@ -2229,7 +2231,7 @@ static PHP_METHOD(swoole_http_client, push)
     }
 
     http_client_buffer->clear();
-    if (php_swoole_websocket_frame_pack(http_client_buffer, zdata, opcode, flags & SW_WEBSOCKET_FLAGS_ALL, http->websocket_mask, 0) < 0)
+    if (php_swoole_websocket_frame_pack(http_client_buffer, zdata, opcode, flags & WebSocket::FLAGS_ALL, http->websocket_mask, 0) < 0)
     {
         RETURN_FALSE;
     }
